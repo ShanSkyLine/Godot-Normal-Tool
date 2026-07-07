@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Normal-Godot β</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="logo-wrap">
+    <div class="logo-mark"></div>
+    <span class="hdr-title">Normal-Godot</span>
+    <span class="hdr-beta">BETA</span>
+  </div>
+  <span class="hdr-sep">/</span>
+  <span class="hdr-sub" data-i18n="subtitle">normal map generator for Godot 4</span>
+  <div class="hdr-tabs">
+    <button class="htab on" id="htabGen" onclick="switchTool('generate')"><span class="mi">blur_on</span>Generate</button>
+    <button class="htab" id="htabFill" onclick="switchTool('fill')"><span class="mi">format_color_fill</span>Fill<span class="key">F1</span></button>
+    <button class="htab" id="htabSpin" onclick="openSpin()"><span class="mi">3d_rotation</span><span data-i18n="tab_preview">Preview</span><span class="key">F3</span></button>
+  </div>
+  <div class="hdr-right">
+    <button class="support-btn" id="langBtn" onclick="toggleLang()" style="min-width:38px;justify-content:center">RU</button>
+    <button class="support-btn" onclick="openSupport()"><span class="mi">favorite</span><span class="lbl" data-i18n="support">Support</span></button>
+    <button class="ibtn" title="Tutorial" onclick="openTutorial()"><span class="mi">help_outline</span></button>
+  </div>
+</header>
+
+<div class="app">
+
+<!-- LEFT PANEL -->
+<aside class="panel left-panel">
+<div class="panel-scroll">
+  <div class="sec">
+    <div class="sec-lbl"><span class="mi">tune</span><span data-i18n="input_mode">Input mode</span></div>
+    <div class="tabs">
+      <button class="tab on" onclick="setMode('single',this)">Single</button>
+      <button class="tab" onclick="setMode('spritesheet',this)">Sheet</button>
+      <button class="tab" onclick="setMode('frames',this)">Frames</button>
+    </div>
+  </div>
+  <div class="sec">
+    <div class="drop" id="dropZone">
+      <input type="file" id="fileInput" accept="image/*" onchange="handleFiles(this.files)">
+      <span class="mi">upload_file</span>
+      <p><b>Drop or click</b><br>PNG · WebP · alpha OK</p>
+    </div>
+  </div>
+  <div class="sec" id="sheetCfg" style="display:none">
+    <div class="sec-lbl"><span class="mi">grid_on</span>Spritesheet</div>
+    <div class="grid2">
+      <div class="field"><label>Columns</label><input type="number" id="cols" value="4" min="1" max="64" oninput="parseSheet()"></div>
+      <div class="field"><label>Rows</label><input type="number" id="rows" value="4" min="1" max="64" oninput="parseSheet()"></div>
+      <div class="field"><label>Frames</label><input type="number" id="frameCount" value="16" min="1" max="512" oninput="parseSheet()"></div>
+      <div class="field"><label>Start</label><input type="number" id="startFrame" value="0" min="0" oninput="parseSheet()"></div>
+    </div>
+  </div>
+  <div class="hdiv"></div>
+
+  <div class="sec">
+    <div class="sec-lbl"><span class="mi">blur_on</span><span data-i18n="generation">Generation</span></div>
+
+    <div class="field" style="margin-bottom:10px">
+      <label data-i18n="engine">Engine</label>
+      <div class="seg">
+        <button class="on" id="engClassic" onclick="setEngine('classic',this)" data-i18n="eng_classic">Classic</button>
+        <button id="engX" onclick="setEngine('x',this)">Experimental ⚡</button>
+      </div>
+    </div>
+
+    <div class="sl-row"><span>Strength <i class="tip-icon" data-tip="sStr">i</i></span><span class="sl-val" id="vStr">2.5</span></div>
+    <input type="range" min="0.1" max="10" step="0.1" value="2.5" id="sStr" oninput="sv('vStr',this,1);LP()">
+
+    <div class="sl-row"><span>Z Range <i class="tip-icon" data-tip="sZ">i</i></span><span class="sl-val" id="vZ">0.50</span></div>
+    <input type="range" min="0.05" max="1" step="0.05" value="0.5" id="sZ" oninput="sv('vZ',this,2);LP()">
+
+    <!-- X engine sliders -->
+    <div id="xPanel" style="display:none">
+      <div class="sl-row"><span>Detail <i class="tip-icon" data-tip="sXDetail">i</i></span><span class="sl-val" id="vXDetail">0.50</span></div>
+      <input type="range" min="0" max="1.5" step="0.05" value="0.5" id="sXDetail" oninput="sv('vXDetail',this,2);LP()">
+      <div class="sl-row"><span>Volume <i class="tip-icon" data-tip="sXVolume">i</i></span><span class="sl-val" id="vXVolume">0.60</span></div>
+      <input type="range" min="0" max="1.5" step="0.05" value="0.6" id="sXVolume" oninput="sv('vXVolume',this,2);LP()">
+      <div class="sl-row"><span>Shape <i class="tip-icon" data-tip="sXShape">i</i></span><span class="sl-val" id="vXShape">0.40</span></div>
+      <input type="range" min="0" max="1" step="0.05" value="0.4" id="sXShape" oninput="sv('vXShape',this,2);LP()">
+      <div class="sl-row"><span>Smooth <i class="tip-icon" data-tip="sXSmooth">i</i></span><span class="sl-val" id="vXSmooth">0.30</span></div>
+      <input type="range" min="0" max="0.9" step="0.05" value="0.3" id="sXSmooth" oninput="sv('vXSmooth',this,2);LP()">
+    </div>
+
+    <div id="classicPanel">
+
+    <div class="sl-row"><span>Level <i class="tip-icon" data-tip="sLevel">i</i></span><span class="sl-val" id="vLevel">7.0</span></div>
+    <input type="range" min="1" max="10" step="0.1" value="7" id="sLevel" oninput="sv('vLevel',this,1);LP()">
+
+    <div class="sl-row"><span>Blur / Sharp <i class="tip-icon" data-tip="sBlur">i</i></span><span class="sl-val" id="vBlur">1.0</span></div>
+    <input type="range" min="0" max="8" step="0.5" value="1" id="sBlur" oninput="sv('vBlur',this,1);LP()">
+
+    
+    <div class="field" style="margin:4px 0 10px">
+      <label>Filter</label>
+      <div class="seg">
+        <button class="on" id="filtSobel" onclick="setFilter('sobel',this)">Sobel</button>
+        <button id="filtScharr" onclick="setFilter('scharr',this)">Scharr</button>
+      </div>
+    </div>
+
+    <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:5px;font-weight:500">Invert</label>
+    <div class="chk-group">
+      <div class="chk" id="invR" onclick="toggleInv('r',this)">R (X)</div>
+      <div class="chk" id="invG" onclick="toggleInv('g',this)">G (Y)</div>
+      <div class="chk" id="invH" onclick="toggleInv('h',this)">Height</div>
+    </div>
+
+    </div><!-- /classicPanel -->
+
+    <button class="btn btn-ghost" style="margin-top:12px" onclick="resetGen()"><span class="mi">restart_alt</span><span data-i18n="reset_defaults">Reset defaults</span></button>
+  </div>
+  <div class="hdiv"></div>
+
+  <!-- AO -->
+  <div class="sec">
+    <div class="sec-lbl"><span class="mi">blur_circular</span><span data-i18n="ao">Ambient Occlusion</span></div>
+    <div class="sl-row"><span>Radius <i class="tip-icon" data-tip="sAO">i</i></span><span class="sl-val" id="vAORadius">4</span></div>
+    <input type="range" min="1" max="16" step="1" value="4" id="sAORadius" oninput="sv('vAORadius',this,0)">
+    <div class="sl-row"><span>Strength <i class="tip-icon" data-tip="sAOStr">i</i></span><span class="sl-val" id="vAOStr">0.80</span></div>
+    <input type="range" min="0" max="1" step="0.05" value="0.8" id="sAOStr" oninput="sv('vAOStr',this,2)">
+    <button class="btn btn-act" onclick="generateAO()"><span class="mi">auto_awesome</span><span data-i18n="generate_ao">Generate AO</span></button>
+    <button class="btn btn-ghost" id="aoExportBtn" style="margin-top:6px;display:none" onclick="exportAO()"><span class="mi">download</span><span data-i18n="export">Export</span> AO map</button>
+  </div>
+</div>
+</aside>
+
+<!-- CENTER -->
+<div class="center">
+  <div class="vbar">
+    <button class="vtab on" onclick="setView('split',this)"><span class="mi">compare</span>Split</button>
+    <button class="vtab" onclick="setView('orig',this)"><span class="mi">image</span>Orig</button>
+    <button class="vtab" onclick="setView('norm',this)"><span class="mi">blur_circular</span>Normal</button>
+    <button class="vtab" onclick="setView('lit',this)"><span class="mi">highlight</span>Lit</button>
+    <div class="vbar-r">
+      <div class="status"><div class="sdot" id="sdot"></div><span id="stxt">No image</span></div>
+    </div>
+  </div>
+  <div class="zoom-bar">
+    <div class="zoom-btns" style="display:flex;align-items:center;gap:2px">
+      <button class="zbtn" onclick="zoom(-1)"><span class="mi">remove</span></button>
+      <span class="zoom-val" id="zval">100%</span>
+      <button class="zbtn" onclick="zoom(1)"><span class="mi">add</span></button>
+      <button class="zbtn" title="Fit" onclick="zoomFit()"><span class="mi">fit_screen</span></button>
+      <button class="zbtn" title="1:1" onclick="zoomReset()"><span class="mi">crop_free</span></button>
+    </div>
+    <span style="margin-left:auto;font-size:10px;color:var(--muted)" id="lightSrcLbl"></span>
+  </div>
+  <div class="cw" id="cw">
+    <div class="empty" id="emptyState">
+      <span class="mi">layers</span>
+      <p>Load a sprite to generate a normal map</p>
+      <p style="font-size:10px;margin-top:4px">100% local · nothing uploaded</p>
+    </div>
+    <div id="previews" style="display:none;gap:16px;align-items:flex-start;flex-wrap:wrap">
+      <div class="cv-box" id="boxOrig"><div class="cv-lbl">Original</div><div class="cv-frame"><canvas id="cvOrig"></canvas></div></div>
+      <div class="cv-box" id="boxNorm"><div class="cv-lbl">Normal map</div><div class="cv-frame"><canvas id="cvNorm"></canvas></div></div>
+      <div class="cv-box" id="boxLit" style="display:none"><div class="cv-lbl">Lit preview</div><div class="cv-frame"><canvas id="cvLit"></canvas></div></div>
+      <div class="cv-box" id="boxAO" style="display:none"><div class="cv-lbl">AO map</div><div class="cv-frame"><canvas id="cvAO"></canvas></div></div>
+    </div>
+  </div>
+  <div class="prog-wrap" id="progWrap"><div class="prog-track"><div class="prog-fill" id="progFill"></div></div></div>
+  <div class="strip" id="strip">
+    <div class="strip-hdr">
+      <div class="sec-lbl"><span class="mi">film</span>Frames (<span id="fcLbl">0</span>)</div>
+      <button class="play-btn" id="playBtn" onclick="togglePlay()" style="display:none"><span class="mi" id="playIco">play_arrow</span><span id="playTxt">Play</span></button>
+      <div class="fps-row">FPS<input type="number" id="fpsIn" value="8" min="1" max="60"></div>
+    </div>
+    <div class="frames-row" id="framesRow"></div>
+  </div>
+</div>
+
+<!-- RIGHT PANEL -->
+<aside class="panel right-panel">
+<div class="panel-scroll">
+  <div class="sec">
+    <div class="sec-lbl"><span class="mi">imagesearch_roller</span><span data-i18n="custom_normal">Custom normal</span></div>
+    <div class="info-box" style="margin-bottom:8px;font-size:10px">Load your own normal map to preview lit on the sprite.</div>
+    <div class="drop" id="dropNormal" style="padding:12px">
+      <input type="file" id="fileNormal" accept="image/*" onchange="loadCustomNormal(this.files)">
+      <span class="mi" style="font-size:20px">add_photo_alternate</span>
+      <p style="font-size:10px"><b>Load normal map</b></p>
+    </div>
+    <button class="btn btn-ghost" id="clearNormalBtn" style="margin-top:6px;display:none" onclick="clearCustomNormal()"><span class="mi">close</span>Use generated</button>
+  </div>
+  <div class="hdiv"></div>
+  <div class="sec">
+    <div class="sec-lbl"><span class="mi">wb_incandescent</span><span data-i18n="lights">Lights</span></div>
+    <div class="light-list" id="lightList"></div>
+    <button class="add-light-btn" onclick="addLight()"><span class="mi">add</span>Add light</button>
+  </div>
+  <div class="hdiv"></div>
+  <div class="sec">
+    <div class="sec-lbl"><span class="mi">download</span><span data-i18n="export">Export</span></div>
+    <div class="exp-row" onclick="exportSingle()"><span class="mi">image</span><div class="exp-txt"><b>Normal map PNG</b><span>Current frame</span></div></div>
+    <div class="exp-row" id="expSheet" onclick="exportSpritesheet()" style="display:none"><span class="mi">grid_view</span><div class="exp-txt"><b>Normal spritesheet</b><span>Same grid</span></div></div>
+    <div class="exp-row" id="expAll" onclick="exportAll()" style="display:none"><span class="mi">folder_zip</span><div class="exp-txt"><b>All frames</b><span>Individual PNGs</span></div></div>
+    <div class="exp-row" onclick="copyGodot()"><span class="mi">code</span><div class="exp-txt"><b>Godot 4 snippet</b><span>Copy</span></div></div>
+    <div class="exp-row" onclick="copyGodotImport()"><span class="mi">settings_applications</span><div class="exp-txt"><b data-i18n="godot_import">Godot .import file</b><span data-i18n="import_desc">Ready-to-use import config</span></div></div>
+    <div class="exp-row" onclick="exportTilesheet()"><span class="mi">dashboard</span><div class="exp-txt"><b data-i18n="tilesheet">Tilesheet (custom grid)</b><span data-i18n="tilesheet_desc">Pack frames into tiles</span></div></div>
+  </div>
+  <div class="hdiv"></div>
+  <div class="sec">
+    <div class="sec-lbl"><span class="mi">info_outline</span><span data-i18n="info">Info</span></div>
+    <div class="info-box" id="infoBox">No image loaded.</div>
+  </div>
+</div>
+</aside>
+</div><!-- /app -->
+
+<!-- MOBILE NAV -->
+<nav class="mob-nav"><div class="mob-nav-inner">
+  <button class="mnav on" id="mnavInput" onclick="openSheet('shInput',this)"><span class="mi">tune</span>Input</button>
+  <button class="mnav" id="mnavGen" onclick="openSheet('shGen',this)"><span class="mi">blur_on</span>Adjust</button>
+  <button class="mnav" id="mnavAO" onclick="openSheet('shAO',this)"><span class="mi">blur_circular</span>AO</button>
+  <button class="mnav" id="mnavLights" onclick="openSheet('shLights',this)"><span class="mi">wb_incandescent</span><span data-i18n="lights">Lights</span></button>
+  <button class="mnav" onclick="openSpin()"><span class="mi">3d_rotation</span>Spin</button>
+  <button class="mnav" id="mnavExport" onclick="openSheet('shExport',this)"><span class="mi">download</span><span data-i18n="export">Export</span></button>
+</div></nav>
+
+<!-- MOBILE SHEETS -->
+<div class="sheet" id="shInput"><div class="sheet-handle"></div><div class="sheet-inner">
+  <div class="sec-lbl" style="margin-bottom:8px"><span class="mi">tune</span><span data-i18n="input_mode">Input mode</span></div>
+  <div class="tabs" style="margin-bottom:12px">
+    <button class="tab on" onclick="setMode('single',this);closeSheet()">Single</button>
+    <button class="tab" onclick="setMode('spritesheet',this);closeSheet()">Sheet</button>
+    <button class="tab" onclick="setMode('frames',this);closeSheet()">Frames</button>
+  </div>
+  <div class="drop" style="margin-bottom:10px">
+    <input type="file" id="fileInputM" accept="image/*" onchange="handleFiles(this.files);closeSheet()">
+    <span class="mi">upload_file</span><p><b>Tap to load image</b><br>PNG · WebP</p>
+  </div>
+  <div id="shSheetCfg" style="display:none">
+    <div class="grid2">
+      <div class="field"><label>Columns</label><input type="number" id="mCols" value="4" min="1" oninput="syncSheet()"></div>
+      <div class="field"><label>Rows</label><input type="number" id="mRows" value="4" min="1" oninput="syncSheet()"></div>
+      <div class="field"><label>Frames</label><input type="number" id="mFC" value="16" min="1" oninput="syncSheet()"></div>
+      <div class="field"><label>Start</label><input type="number" id="mSF" value="0" min="0" oninput="syncSheet()"></div>
+    </div>
+  </div>
+</div></div>
+
+<div class="sheet" id="shGen"><div class="sheet-handle"></div><div class="sheet-inner">
+  <div class="sec-lbl" style="margin-bottom:10px"><span class="mi">blur_on</span><span data-i18n="generation">Generation</span></div>
+  <div class="field" style="margin-bottom:10px">
+    <label data-i18n="engine">Engine</label>
+    <div class="seg">
+      <button class="on" id="mEngClassic" onclick="setEngine('classic',this)" data-i18n="eng_classic">Classic</button>
+      <button id="mEngX" onclick="setEngine('x',this)">Experimental ⚡</button>
+    </div>
+  </div>
+  <div class="sl-row"><span>Strength</span><span class="sl-val" id="mvStr">2.5</span></div>
+  <input type="range" min="0.1" max="10" step="0.1" value="2.5" id="msStr" oninput="msync('msStr','sStr','mvStr','vStr',1);LP()">
+  <div id="mClassicPanel">
+  <div class="sl-row"><span>Level</span><span class="sl-val" id="mvLevel">7.0</span></div>
+  <input type="range" min="1" max="10" step="0.1" value="7" id="msLevel" oninput="msync('msLevel','sLevel','mvLevel','vLevel',1);LP()">
+  <div class="sl-row"><span>Blur / Sharp</span><span class="sl-val" id="mvBlur">1.0</span></div>
+  <input type="range" min="0" max="8" step="0.5" value="1" id="msBlur" oninput="msync('msBlur','sBlur','mvBlur','vBlur',1);LP()">
+  </div>
+  <div class="sl-row"><span>Z Range</span><span class="sl-val" id="mvZ">0.50</span></div>
+  <input type="range" min="0.05" max="1" step="0.05" value="0.5" id="msZ" oninput="msync('msZ','sZ','mvZ','vZ',2);LP()">
+  <div id="mXPanel" style="display:none">
+    <div class="sl-row"><span>Detail</span><span class="sl-val" id="mvXDetail">0.50</span></div>
+    <input type="range" min="0" max="1.5" step="0.05" value="0.5" id="msXDetail" oninput="msync('msXDetail','sXDetail','mvXDetail','vXDetail',2);LP()">
+    <div class="sl-row"><span>Volume</span><span class="sl-val" id="mvXVolume">0.60</span></div>
+    <input type="range" min="0" max="1.5" step="0.05" value="0.6" id="msXVolume" oninput="msync('msXVolume','sXVolume','mvXVolume','vXVolume',2);LP()">
+    <div class="sl-row"><span>Shape</span><span class="sl-val" id="mvXShape">0.40</span></div>
+    <input type="range" min="0" max="1" step="0.05" value="0.4" id="msXShape" oninput="msync('msXShape','sXShape','mvXShape','vXShape',2);LP()">
+    <div class="sl-row"><span>Smooth</span><span class="sl-val" id="mvXSmooth">0.30</span></div>
+    <input type="range" min="0" max="0.9" step="0.05" value="0.3" id="msXSmooth" oninput="msync('msXSmooth','sXSmooth','mvXSmooth','vXSmooth',2);LP()">
+  </div>
+  <div class="field" style="margin:4px 0 10px">
+    <label>Filter</label>
+    <div class="seg"><button class="on" id="mFiltSobel" onclick="setFilter('sobel',this)">Sobel</button>
+    <button id="mFiltScharr" onclick="setFilter('scharr',this)">Scharr</button></div>
+  </div>
+  <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:5px">Invert</label>
+  <div class="chk-group">
+    <div class="chk" id="mInvR" onclick="toggleInv('r',this)">R (X)</div>
+    <div class="chk" id="mInvG" onclick="toggleInv('g',this)">G (Y)</div>
+    <div class="chk" id="mInvH" onclick="toggleInv('h',this)">Height</div>
+  </div>
+</div></div>
+
+<div class="sheet" id="shAO"><div class="sheet-handle"></div><div class="sheet-inner">
+  <div class="sec-lbl" style="margin-bottom:10px"><span class="mi">blur_circular</span><span data-i18n="ao">Ambient Occlusion</span></div>
+  <div class="sl-row"><span>Radius</span><span class="sl-val" id="mvAORadius">4</span></div>
+  <input type="range" min="1" max="16" step="1" value="4" id="msAORadius" oninput="$('sAORadius').value=this.value;sv('vAORadius',this,0);sv('mvAORadius',this,0)">
+  <div class="sl-row"><span>Strength</span><span class="sl-val" id="mvAOStr">0.80</span></div>
+  <input type="range" min="0" max="1" step="0.05" value="0.8" id="msAOStr" oninput="$('sAOStr').value=this.value;sv('vAOStr',this,2);sv('mvAOStr',this,2)">
+  <button class="btn btn-act" style="margin-top:6px" onclick="generateAO();closeSheet()"><span class="mi">auto_awesome</span><span data-i18n="generate_ao">Generate AO</span></button>
+</div></div>
+
+<div class="sheet" id="shLights"><div class="sheet-handle"></div><div class="sheet-inner">
+  <div class="sec-lbl" style="margin-bottom:8px"><span class="mi">wb_incandescent</span><span data-i18n="lights">Lights</span></div>
+  <div class="light-list" id="lightListM"></div>
+  <button class="add-light-btn" onclick="addLight()"><span class="mi">add</span>Add light</button>
+</div></div>
+
+<div class="sheet" id="shExport"><div class="sheet-handle"></div><div class="sheet-inner">
+  <div class="sec-lbl" style="margin-bottom:8px"><span class="mi">download</span><span data-i18n="export">Export</span></div>
+  <div class="exp-row" onclick="exportSingle();closeSheet()"><span class="mi">image</span><div class="exp-txt"><b>Normal map PNG</b><span>Current frame</span></div></div>
+  <div class="exp-row" id="expSheetM" onclick="exportSpritesheet();closeSheet()" style="display:none"><span class="mi">grid_view</span><div class="exp-txt"><b>Normal spritesheet</b><span>Same grid</span></div></div>
+  <div class="exp-row" onclick="copyGodot();closeSheet()"><span class="mi">code</span><div class="exp-txt"><b>Godot 4 snippet</b></div></div>
+</div></div>
+
+<!-- FILL MODAL -->
+<div class="modal-bg" id="fillModal">
+  <div class="modal">
+    <div class="modal-hdr"><span class="mi">format_color_fill</span><h3>Fill Normals</h3>
+      <button class="modal-close" onclick="closeFill()"><span class="mi">close</span></button></div>
+    <div class="modal-body">
+      <div class="info-box" style="margin-bottom:12px;font-size:10px">Radial normal fill — colours spread from the sprite centre outward. Good for round/blob objects.</div>
+      <div class="sl-row"><span>Dome curvature</span><span class="sl-val" id="vFillCurve">1.0</span></div>
+      <input type="range" min="0.2" max="3" step="0.1" value="1" id="sFillCurve" oninput="sv('vFillCurve',this,1);renderFillPreview()">
+      <div class="sl-row"><span>Radius</span><span class="sl-val" id="vFillRad">1.0</span></div>
+      <input type="range" min="0.3" max="2" step="0.1" value="1" id="sFillRad" oninput="sv('vFillRad',this,1);renderFillPreview()">
+      <div class="field" style="margin:10px 0">
+        <label>Shape</label>
+        <div class="seg"><button class="on" id="fillRadial" onclick="setFillShape('radial',this)">Radial</button>
+        <button id="fillConic" onclick="setFillShape('conic',this)">Directional</button></div>
+      </div>
+      <div style="display:flex;justify-content:center;margin:12px 0">
+        <div class="cv-frame"><canvas id="cvFill" style="max-width:180px;max-height:180px"></canvas></div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-act" onclick="applyFill()"><span class="mi">check</span>Use as normal map</button>
+        <button class="btn btn-ghost" onclick="downloadFill()"><span class="mi">download</span>Download</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TUTORIAL MODAL -->
+<div class="modal-bg" id="tutModal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-hdr"><span class="mi">school</span><h3>Getting started</h3>
+      <button class="modal-close" onclick="closeTutorial()"><span class="mi">close</span></button></div>
+    <div class="modal-body">
+      <div class="tut-step active" id="tutContent">
+        <span class="tut-icon" id="tutIcon">⬡</span>
+        <div class="tut-title" id="tutTitle"></div>
+        <div class="tut-text" id="tutText"></div>
+      </div>
+      <div class="tut-dots" id="tutDots"></div>
+      <div class="tut-nav">
+        <button class="btn btn-ghost" id="tutPrev" onclick="tutPrev()" style="width:auto;padding:6px 14px">← Back</button>
+        <span id="tutCounter" style="font-size:10px;color:var(--muted)"></span>
+        <button class="btn btn-act" id="tutNext" onclick="tutNext()" style="width:auto;padding:6px 14px">Next →</button>
+      </div>
+      <button class="btn btn-ghost" id="tutSkip" onclick="closeTutorial()" style="margin-top:8px;font-size:10px;opacity:.6">Skip tutorial</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUPPORT MODAL -->
+<div class="modal-bg" id="supportModal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-hdr"><span class="mi">favorite</span><h3>Support Normal-Godot</h3>
+      <button class="modal-close" onclick="closeSupport()"><span class="mi">close</span></button></div>
+    <div class="modal-body">
+      <div class="info-box" style="margin-bottom:14px;font-size:11px">
+        Normal-Godot is free and open. If it saves you time, consider supporting development 🙏
+      </div>
+      <div class="support-grid">
+        <div class="support-item">
+          <span class="si-icon">💳</span>
+          <span class="si-name">DonationAlerts</span>
+          <span class="si-desc">One-time donation</span>
+          <span class="soon">SOON</span>
+        </div>
+        <div class="support-item">
+          <span class="si-icon">🚀</span>
+          <span class="si-name">Boosty</span>
+          <span class="si-desc">Updates & news</span>
+          <span class="soon">SOON</span>
+        </div>
+        <div class="support-item">
+          <span class="si-icon">₿</span>
+          <span class="si-name">Crypto</span>
+          <span class="si-desc">BTC / ETH / TON</span>
+          <span class="soon">SOON</span>
+        </div>
+      </div>
+      <div class="support-note">Links coming soon. Stay tuned on Boosty for updates!</div>
+    </div>
+  </div>
+</div>
+
+<!-- RECENT MODAL -->
+<div class="modal-bg" id="recentModal">
+  <div class="modal">
+    <div class="modal-hdr"><span class="mi">history</span><h3>Recent normals</h3>
+      <button class="modal-close" onclick="$('recentModal').classList.remove('open')"><span class="mi">close</span></button></div>
+    <div class="modal-body"><div class="recent-grid" id="recentList"></div></div>
+  </div>
+</div>
+
+<!-- SPIN OVERLAY -->
+<div class="fullov" id="spinOverlay">
+  <div class="ov-bar">
+    <button class="ov-back" onclick="closeSpin()"><span class="mi">arrow_back</span></button>
+    <span class="ov-title"><span class="mi" style="font-size:15px;vertical-align:-2px">3d_rotation</span> <span data-i18n="preview_title">Advanced Preview</span></span>
+  </div>
+  <div class="spin-body">
+    <div class="spin-stage">
+      <canvas id="spinCv" onmousedown="spinCenterPick(event)" ontouchstart="spinCenterPick(event)"></canvas>
+      <div class="center-marker" id="centerMarker" style="display:none"></div>
+    </div>
+    <div class="spin-controls">
+      <div class="sec-lbl"><span class="mi">image</span>Source</div>
+      <button class="btn btn-act" style="margin-bottom:6px" onclick="spinUseCurrent()"><span class="mi">blur_on</span>Use current generated</button>
+      <button class="btn btn-act" style="margin-bottom:6px" onclick="spinFromRecent()"><span class="mi">history</span>From recent</button>
+      <div class="drop" style="padding:10px;margin-bottom:6px">
+        <input type="file" accept="image/*" onchange="spinFileSprite(this.files)">
+        <span class="mi" style="font-size:18px">image</span>
+        <p style="font-size:10px"><b>Sprite from file</b><br><span id="spinSpriteName" style="color:var(--dim)"></span></p>
+      </div>
+      <div class="drop" style="padding:10px;margin-bottom:12px">
+        <input type="file" accept="image/*" onchange="spinFileNormal(this.files)">
+        <span class="mi" style="font-size:18px">imagesearch_roller</span>
+        <p style="font-size:10px"><b>Normal from file</b><br><span id="spinNormalName" style="color:var(--dim)"></span></p>
+      </div>
+      <div class="sec-lbl"><span class="mi">center_focus_strong</span>Rotation center</div>
+      <div class="seg" style="margin-bottom:6px">
+        <button class="on" id="centerAuto" onclick="spinSetCenterMode('auto')">Auto</button>
+        <button id="centerManual" onclick="spinSetCenterMode('manual')">Manual</button>
+      </div>
+      <div id="centerPickHint" style="display:none;font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5">Tap the preview to set rotation center.</div>
+      <div class="sec-lbl"><span class="mi">settings</span>Animation</div>
+      <div class="field" style="margin-bottom:8px">
+        <label>Spin mode</label>
+        <div class="seg">
+          <button class="on" id="spinModeObj" onclick="spinSetMode('object')">Sprite spins</button>
+          <button id="spinModeLight" onclick="spinSetMode('light')">Light orbits</button>
+        </div>
+      </div>
+      <div class="sl-row"><span>Speed</span><span class="sl-val" id="vSpinSpeed">1.0</span></div>
+      <input type="range" id="spinSpeed" min="0.1" max="5" step="0.1" value="1" oninput="sv('vSpinSpeed',this,1)">
+      <div class="sl-row"><span>Video duration (s)</span><span class="sl-val" id="vSpinDur">3</span></div>
+      <input type="range" id="spinDuration" min="1" max="10" step="1" value="3" oninput="sv('vSpinDur',this,0)">
+      <div class="sec-lbl" style="margin-top:8px"><span class="mi">palette</span>Background</div>
+      <div class="bg-swatch">
+        <input type="color" id="spinBgColor" value="#808080" oninput="spinSetBg(this.value)">
+        <span style="font-size:11px;color:var(--muted)">Video / PNG background</span>
+      </div>
+      <div class="tog-row">
+        <span>Transparent</span>
+        <div class="tog" id="spinBgTransp" onclick="spinToggleTransparent(this)"></div>
+      </div>
+      <div class="sec-lbl"><span class="mi">wb_incandescent</span><span data-i18n="lights">Lights</span></div>
+      <div id="spinLightList"></div>
+      <button class="add-light-btn" style="margin-bottom:12px" onclick="spinAddLight()"><span class="mi">add</span>Add light</button>
+      <div class="sec-lbl"><span class="mi">download</span><span data-i18n="export">Export</span></div>
+      <button class="btn btn-act" style="margin-bottom:6px" onclick="spinExportPNG()"><span class="mi">image</span>PNG (500×500)</button>
+      <button class="btn btn-act" id="spinRecBtn" onclick="spinExportVideo()"><span class="mi">videocam</span>Record video</button>
+    </div>
+  </div>
+</div>
+
+<!-- Spin recent -->
+<div class="modal-bg" id="spinRecentModal">
+  <div class="modal">
+    <div class="modal-hdr"><span class="mi">history</span><h3>Recent normals</h3>
+      <button class="modal-close" onclick="$('spinRecentModal').classList.remove('open')"><span class="mi">close</span></button></div>
+    <div class="modal-body"><div class="recent-grid" id="spinRecentList"></div></div>
+  </div>
+</div>
+
+<!-- TILESHEET MODAL -->
+<div class="modal-bg" id="tileModal">
+  <div class="modal" style="max-width:300px">
+    <div class="modal-hdr"><span class="mi">dashboard</span><h3 data-i18n="tilesheet">Tilesheet</h3>
+      <button class="modal-close" onclick="$('tileModal').classList.remove('open')"><span class="mi">close</span></button></div>
+    <div class="modal-body">
+      <div class="field" style="margin-bottom:12px">
+        <label data-i18n="tile_prompt">Tiles per row?</label>
+        <input type="number" id="tileCount" value="4" min="1" max="64">
+      </div>
+      <button class="btn btn-act" onclick="confirmTilesheet()"><span class="mi">download</span><span data-i18n="export">Export</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="i18n.js"></script>
+<script src="core.js"></script>
+<script src="generate.js"></script>
+<script src="lights.js"></script>
+<script src="ao.js"></script>
+<script src="spin.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>
