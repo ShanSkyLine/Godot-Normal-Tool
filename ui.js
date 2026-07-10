@@ -1,9 +1,9 @@
 // ════════════════════════════════════════════════════════════
-// ui.js — tabs, mobile sheets, tutorial, tooltips, support, hotkeys
+// ui.js — tabs, mobile sheets, tutorial, tooltips, hotkeys
 // ════════════════════════════════════════════════════════════
 
 function setActiveTab(id){
-  ['htabGen','htabFill','htabSpin'].forEach(t=>{const e=$(t);if(e)e.classList.toggle('on',t===id)});
+  ['htabGen','htabFill'].forEach(t=>{const e=$(t);if(e)e.classList.toggle('on',t===id)});
 }
 function switchTool(tl){
   $('htabGen').classList.toggle('on',tl==='generate');
@@ -61,7 +61,7 @@ function initSheetDrag(){
 // ════════════ TOOLTIPS ════════════
 let TIPS={};
 function refreshTips(){
-  TIPS={sStr:t('tip_str'),sLevel:t('tip_level'),sBlur:t('tip_blur'),sZ:t('tip_z'),sAO:t('tip_ao'),sAOStr:t('tip_aostr'),sXDetail:t('tip_xdetail'),sXVolume:t('tip_xvolume'),sXShape:t('tip_xshape'),sXSmooth:t('tip_xsmooth')};
+  TIPS={sStr:t('tip_str'),sLevel:t('tip_level'),sBlur:t('tip_blur'),sZ:t('tip_z'),sAO:t('tip_ao'),sAOStr:t('tip_aostr'),sXDetail:t('tip_xdetail'),sXVolume:t('tip_xvolume'),sXShape:t('tip_xshape'),sXSmooth:t('tip_xsmooth'),sXCrisp:t('tip_xcrisp')};
 }
 const tipEl=document.createElement('div');tipEl.className='tooltip';document.body.appendChild(tipEl);
 let tipTimeout;
@@ -105,18 +105,12 @@ function renderTutStep(){
 function tutNext(){const steps=curTutSteps();if(tutStep===steps.length-1){closeTutorial();return;}tutStep++;renderTutStep();}
 function tutPrev(){if(tutStep>0){tutStep--;renderTutStep();}}
 
-// ════════════ SUPPORT ════════════
-function openSupport(){$('supportModal').classList.add('open');}
-function closeSupport(){$('supportModal').classList.remove('open');}
-
 // ════════════ HOTKEYS ════════════
 document.addEventListener('keydown',e=>{
   if(e.key==='F1'){e.preventDefault();$('fillModal').classList.contains('open')?closeFill():switchTool('fill');}
-  if(e.key==='F3'){e.preventDefault();Spin.open?closeSpin():openSpin();}
-  if(e.key==='Escape'){closeFill();if(Spin.open)closeSpin();
-    ['tutModal','supportModal','recentModal','spinRecentModal'].forEach(id=>{const el=$(id);if(el)el.classList.remove('open');});}
+  if(e.key==='Escape'){closeFill();
+    ['tutModal','recentModal'].forEach(id=>{const el=$(id);if(el)el.classList.remove('open');});}
 });
-window.addEventListener('resize',()=>{if(Spin.open)resizeSpin();});
 
 
 // ════════════ UX: full-window drop, view hotkeys, ctrl+wheel zoom ════════════
@@ -133,7 +127,7 @@ function initUX(){
   });
   // View hotkeys 1-4
   document.addEventListener('keydown',e=>{
-    if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||Spin.open)return;
+    if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
     const views={'1':'split','2':'orig','3':'norm','4':'lit'};
     if(views[e.key]){
       const idx={'1':1,'2':2,'3':3,'4':4}[e.key];
@@ -162,6 +156,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   const lb=$('langBtn');if(lb)lb.textContent=curLang==='en'?'RU':'EN';
   initDropZones();
   rebuildLightUI();
+  rebuildLayersUI();
+  initLayerDrag();
   refreshTips();
   initTooltips();
   initSheetDrag();

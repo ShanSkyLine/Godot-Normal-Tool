@@ -18,6 +18,7 @@ function initDropZones(){
 function handleFiles(list){
   const files = [...list].filter(f => f.type.startsWith('image/'));
   if (!files.length) return;
+  if (App.mode === 'layers'){ addLayerFiles(files); return; }
   if (App.mode === 'frames' && files.length > 1) loadMulti(files); else loadOne(files[0]);
 }
 function loadOne(file){
@@ -273,11 +274,14 @@ function togglePlay(){
 function setMode(m, btn){
   App.mode = m; qsa('.tab').forEach(el => el.classList.remove('on'));
   qsa('.tab').forEach(el => { const t = el.textContent.trim().toLowerCase();
-    if ((m==='single'&&t==='single')||(m==='spritesheet'&&t==='sheet')||(m==='frames'&&t==='frames')) el.classList.add('on'); });
-  const sh = m==='spritesheet';
+    if ((m==='single'&&t==='single')||(m==='spritesheet'&&t==='sheet')||(m==='frames'&&t==='frames')||(m==='layers'&&t==='layers')) el.classList.add('on'); });
+  const sh = m==='spritesheet', ly = m==='layers';
   ['sheetCfg','shSheetCfg'].forEach(id => { const e = $(id); if (e) e.style.display = sh ? 'block' : 'none'; });
-  $('fileInput').multiple = (m==='frames');
-  const fm = $('fileInputM'); if (fm) fm.multiple = (m==='frames');
+  ['layersCfg','shLayersCfg'].forEach(id => { const e = $(id); if (e) e.style.display = ly ? 'block' : 'none'; });
+  $('fileInput').multiple = (m==='frames'||m==='layers');
+  const fm = $('fileInputM'); if (fm) fm.multiple = (m==='frames'||m==='layers');
+  if (ly && App.layers.length) recomputeLayers();
+  else updateLayerCanvasEditable();
 }
 function setView(v, btn){
   App.viewMode = v; qsa('.vtab').forEach(el => el.classList.remove('on'));
@@ -336,18 +340,43 @@ async function exportAll(){
   }
   toast(t('all_saved'));
 }
+// ════════════ GODOT INTEGRATION ════════════
+function hexToGdColor(hex){
+  const r = (parseInt(hex.slice(1,3),16)/255).toFixed(3);
+  const g = (parseInt(hex.slice(3,5),16)/255).toFixed(3);
+  const b = (parseInt(hex.slice(5,7),16)/255).toFixed(3);
+  return `Color(${r}, ${g}, ${b})`;
+}
+function genUid(){
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let s = 'uid://';
+  for (let i = 0; i < 13; i++) s += chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+function godotBaseName(){
+  if (App.mode === 'layers') return 'normal_layers_combined';
+  if (App.frames.length > 1) return `normal_frame_${String(App.curFrame).padStart(4,'0')}`;
+  return 'normal_map';
+}
+// Builds a GDScript body (tab-indented) recreating the lights configured
+// in the app's own Lights panel — this is real app state, not a placeholder.
+function godotLightsBody(){
+  const lights = App.lights.filter(l => l.enabled);
+  if (!lights.length){
+    return `\tvar light := PointLight2D.new()\n\tlight.color = Color(1, 1, 1)\n\tlight.energy = 1.0\n\tadd_child(light)`;
+  }
+  return lights.map((l, i) => {
+    const v = lights.length > 1 ? `light${i+1}` : 'light';
+    return `\tvar ${v} := PointLight2D.new()\n\t${v}.color = ${hexToGdColor(l.color)}\n\t${v}.energy = ${l.intensity.toFixed(2)}\n\t${v}.position = Vector2(${Math.round(l.x*80)}, ${Math.round(-l.y*80)})\n\t${v}.shadow_enabled = true\n\tadd_child(${v})`;
+  }).join('\n');
+}
 function copyGodot(){
   const s = `# Normal-Godot — Godot 4
-# 1. Import normal map PNG as Texture2D
-# 2. Sprite2D → CanvasItemMaterial → Normal Map → assign texture
-# 3. Add lights:
-var light = PointLight2D.new()
-light.color = Color(0.4,0.6,1.0)
-light.energy = 2.0
-light.shadow_enabled = true
-light.shadow_filter = PointLight2D.SHADOW_FILTER_NONE
-add_child(light)`;
-  navigator.clipboard.writeText(s).then(() => toast(t('copied_snippet')), () => toast(t('copy_failed')));
+# 1. Import the normal map PNG as a Texture2D
+# 2. Sprite2D -> CanvasItemMaterial -> Normal Map -> assign the texture
+# 3. Lights matching your current preview:
+${godotLightsBody().replace(/\t/g, '')}`;
+  copyToClipboard(s).then(() => toast(t('copied_snippet')), () => toast(t('copy_failed')));
 }
 
 // ════════════ FILL NORMALS TOOL ════════════
@@ -406,19 +435,18 @@ function downloadFill(){
 }
 
 // ════════════ GODOT .import EXPORT ════════════
-function copyGodotImport(){
-  // Godot 4 .import config for a normal-map texture (CanvasTexture-friendly)
-  const cfg = `[remap]
+function godotImportConfig(base, isNormal){
+  return `[remap]
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://normalgodot"
-path="res://.godot/imported/normal_map.png-generated.ctex"
+uid="${genUid()}"
+path="res://.godot/imported/${base}.png-generated.ctex"
 
 [deps]
 
-source_file="res://normal_map.png"
-dest_files=["res://.godot/imported/normal_map.png-generated.ctex"]
+source_file="res://${base}.png"
+dest_files=["res://.godot/imported/${base}.png-generated.ctex"]
 
 [params]
 
@@ -426,15 +454,96 @@ compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1
-compress/normal_map=1
+compress/normal_map=${isNormal ? 1 : 0}
 compress/channel_pack=0
 mipmaps/generate=false
 roughness/mode=0
 process/fix_alpha_border=true
 process/premult_alpha=false
 process/normal_map_invert_y=false
-detect_3d/compress_to=0`;
-  navigator.clipboard.writeText(cfg).then(() => toast(t('copied_import')), () => toast(t('copy_failed')));
+detect_3d/compress_to=0
+`;
+}
+function copyGodotImport(){
+  if (!App.normalFrames.length){ toast(t('generate_first')); return; }
+  const name = godotBaseName();
+  copyToClipboard(godotImportConfig(name, true)).then(
+    () => toast(`${t('copied_import')} — ${name}.png.import`),
+    () => toast(t('copy_failed'))
+  );
+}
+
+// ════════════ GODOT PACKAGE EXPORT (drop-in ready) ════════════
+// Downloads a matched set of files that can be copied straight into a Godot
+// 4 project: the original sprite, the generated normal map, correct .import
+// configs for both (filenames match exactly, so Godot recognizes them),
+// a CanvasTexture .tres wiring diffuse+normal together, a GDScript that
+// recreates the exact lights configured in the app, and a short README.
+function godotTres(name){
+  return `[gd_resource type="CanvasTexture" load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://${name}_diffuse.png" id="1"]
+[ext_resource type="Texture2D" path="res://${name}.png" id="2"]
+
+[resource]
+diffuse_texture = ExtResource("1")
+normal_texture = ExtResource("2")
+`;
+}
+function godotLightsScript(){
+  return `extends Node
+# Generated by Normal-Godot — recreates the lights from your preview.
+# Attach this to the Sprite2D (or a parent Node2D) and call setup_lights()
+# from _ready(), or copy the body into your own script.
+
+func setup_lights() -> void:
+${godotLightsBody()}
+`;
+}
+function godotReadme(name){
+  return `Normal-Godot export package
+============================
+
+Files in this package:
+  ${name}_diffuse.png        - your original sprite
+  ${name}.png                - generated normal map
+  ${name}_diffuse.png.import - import settings for the sprite
+  ${name}.png.import         - import settings for the normal map (flagged as a normal map)
+  ${name}_material.tres      - CanvasTexture combining both, ready to assign
+  ${name}_lights.gd          - script recreating your current light setup
+
+Setup in Godot 4:
+  1. Copy ALL of these files into your project folder (e.g. res://sprites/).
+  2. Focus the Godot editor - it re-imports the new files automatically.
+     If you see a uid mismatch warning, ignore it: Godot regenerates uids
+     on first import, this file just needs to exist.
+  3. On your Sprite2D, set Texture = ${name}_material.tres
+  4. Attach ${name}_lights.gd to the Sprite2D (or a parent Node2D), then
+     call setup_lights() from _ready() - or copy its body into your own script.
+
+Generated by Normal-Godot beta.
+`;
+}
+async function exportGodotPackage(){
+  if (!App.normalFrames.length){ toast(t('generate_first')); return; }
+  const name = godotBaseName();
+  const nd = App.normalFrames[App.curFrame];
+  const srcCanvas = App.frames[App.curFrame].canvas;
+  const normalC = document.createElement('canvas'); normalC.width = nd.width; normalC.height = nd.height;
+  normalC.getContext('2d').putImageData(nd, 0, 0);
+
+  toast(t('godot_pkg_building'));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  dl(srcCanvas, `${name}_diffuse.png`); await wait(180);
+  dl(normalC, `${name}.png`); await wait(180);
+  downloadText(`${name}_diffuse.png.import`, godotImportConfig(name + '_diffuse', false)); await wait(180);
+  downloadText(`${name}.png.import`, godotImportConfig(name, true)); await wait(180);
+  downloadText(`${name}_material.tres`, godotTres(name)); await wait(180);
+  downloadText(`${name}_lights.gd`, godotLightsScript()); await wait(180);
+  downloadText(`README_Godot.txt`, godotReadme(name));
+
+  toast(t('godot_pkg_done'));
 }
 
 // ════════════ TILESHEET EXPORT (custom grid) ════════════
@@ -532,11 +641,14 @@ function genNormalX(src){
   const volume   = +$('sXVolume').value;
   const shapeAmt = +$('sXShape').value;
   const smooth   = +$('sXSmooth').value;
+  const crisp    = +($('sXCrisp') ? $('sXCrisp').value : 0);
   const w = src.width, h = src.height;
   const pix = src.getContext('2d').getImageData(0, 0, w, h);
 
   // 1. alpha-aware height (bleed instead of alpha-multiply → no silhouette halo)
-  const bled = bleedColors(pix, w, h, 8);
+  // 10 iterations (up from 8) reaches further past the silhouette, further
+  // reducing gradient noise right at sprite edges.
+  const bled = bleedColors(pix, w, h, 10);
   let H = new Float32Array(w*h);
   for (let i = 0; i < w*h; i++)
     H[i] = (0.299*bled[i*4] + 0.587*bled[i*4+1] + 0.114*bled[i*4+2]) / 255;
@@ -584,6 +696,20 @@ function genNormalX(src){
     }
   }
 
+  // 5b. micro-contrast — unsharp-mask the normal field back up. Smoothing
+  // (step 5) rounds off fine surface texture; this restores crispness
+  // without reintroducing the hard angular artifacts smoothing removed.
+  if (crisp > 0){
+    const BX = blur(NX,w,h,2), BY = blur(NY,w,h,2);
+    for (let i = 0; i < w*h; i++){
+      let nx = NX[i] + (NX[i]-BX[i])*crisp*1.5;
+      let ny = NY[i] + (NY[i]-BY[i])*crisp*1.5;
+      let nz = NZ[i];
+      const l = Math.sqrt(nx*nx+ny*ny+nz*nz) || 1;
+      NX[i]=nx/l; NY[i]=ny/l; NZ[i]=nz/l;
+    }
+  }
+
   // 6. write with ORIGINAL alpha
   const out = new Uint8ClampedArray(w*h*4);
   for (let i = 0; i < w*h; i++){
@@ -596,6 +722,26 @@ function genNormalX(src){
   return new ImageData(out, w, h);
 }
 
+// Quick-apply combos for the X sliders — a fast starting point that can
+// still be fine-tuned afterwards.
+function setXPreset(name){
+  const P = {
+    soft:     { detail:0.30, volume:0.70, shape:0.50, smooth:0.50, crisp:0.05 },
+    balanced: { detail:0.50, volume:0.60, shape:0.40, smooth:0.30, crisp:0.25 },
+    crisp:    { detail:0.85, volume:0.50, shape:0.30, smooth:0.10, crisp:0.55 },
+  };
+  const p = P[name]; if (!p) return;
+  const ids = ['sXDetail','sXVolume','sXShape','sXSmooth','sXCrisp'];
+  const mids = ['msXDetail','msXVolume','msXShape','msXSmooth','msXCrisp'];
+  const vids = ['vXDetail','vXVolume','vXShape','vXSmooth','vXCrisp'];
+  const mvids = ['mvXDetail','mvXVolume','mvXShape','mvXSmooth','mvXCrisp'];
+  const vals = [p.detail, p.volume, p.shape, p.smooth, p.crisp];
+  ids.forEach((id,i) => { const e=$(id); if (e) e.value = vals[i]; });
+  mids.forEach((id,i) => { const e=$(id); if (e) e.value = vals[i]; });
+  vids.forEach((id,i) => sv(id, {value:vals[i]}, 2));
+  mvids.forEach((id,i) => sv(id, {value:vals[i]}, 2));
+  LP(); toast(t('preset_applied'));
+}
 function setEngine(e, btn){
   App.engine = e;
   $('engClassic').classList.toggle('on', e==='classic');

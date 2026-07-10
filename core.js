@@ -20,6 +20,10 @@ const App = {
   lights: [{ id:1, name:'Main', color:'#ffffff', intensity:1.0, x:0.4, y:-0.4, z:0.82, enabled:true }],
   nextLightId: 2,
   recentPairs: [],     // {id,name,sprite,normal,w,h}
+  layers: [],          // [{id,name,canvas,enabled,x,y,_normalCache}] — top of array = top of stack
+  nextLayerId: 1,
+  soloLayerId: null,   // null = combined view, otherwise preview a single layer
+  layerW: 0, layerH: 0, layerOriginX: 0, layerOriginY: 0, // last composited layer canvas bounds
 };
 const LC = ['#ffffff','#4488ff','#ff8844','#44ffaa','#ff44aa','#ffee44'];
 
@@ -39,8 +43,36 @@ function toC(img){
 function imgFromURL(url){
   return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
 }
+// Escapes text before it's dropped into innerHTML — matters for things like
+// layer names, which come from user-uploaded file names.
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 function dl(canvas, name){
   const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = name; a.click();
+}
+function downloadText(filename, content){
+  const blob = new Blob([content], { type:'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+// Clipboard with a manual fallback (mobile browsers / non-secure contexts
+// often lack navigator.clipboard, so this never silently fails)
+function copyToClipboard(text){
+  if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext){
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve, reject) => {
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      ok ? resolve() : reject(new Error('execCommand copy failed'));
+    } catch(e){ reject(e); }
+  });
 }
 
 // ── status / toast / progress ──
@@ -60,7 +92,12 @@ function toast(msg){
 // ── live preview debounce ──
 function LP(){
   clearTimeout(App.lpTimer);
-  App.lpTimer = setTimeout(() => { if (App.frames.length) processAll(); }, 220);
+  App.lpTimer = setTimeout(() => {
+    if (App.mode === 'layers'){
+      if (App.layers.length){ App.layers.forEach(l => { l._normalCache = null; }); recomputeLayers(); }
+    }
+    else if (App.frames.length) processAll();
+  }, 220);
 }
 
 // ── shared box blur (used by generate + fill) ──

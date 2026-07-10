@@ -13,7 +13,6 @@
 <!-- HEADER -->
 <header class="hdr">
   <div class="logo-wrap">
-    <div class="logo-mark"></div>
     <span class="hdr-title">Normal-Godot</span>
     <span class="hdr-beta">BETA</span>
   </div>
@@ -22,11 +21,9 @@
   <div class="hdr-tabs">
     <button class="htab on" id="htabGen" onclick="switchTool('generate')"><span class="mi">blur_on</span>Generate</button>
     <button class="htab" id="htabFill" onclick="switchTool('fill')"><span class="mi">format_color_fill</span>Fill<span class="key">F1</span></button>
-    <button class="htab" id="htabSpin" onclick="openSpin()"><span class="mi">3d_rotation</span><span data-i18n="tab_preview">Preview</span><span class="key">F3</span></button>
   </div>
   <div class="hdr-right">
     <button class="support-btn" id="langBtn" onclick="toggleLang()" style="min-width:38px;justify-content:center">RU</button>
-    <button class="support-btn" onclick="openSupport()"><span class="mi">favorite</span><span class="lbl" data-i18n="support">Support</span></button>
     <button class="ibtn" title="Tutorial" onclick="openTutorial()"><span class="mi">help_outline</span></button>
   </div>
 </header>
@@ -42,6 +39,7 @@
       <button class="tab on" onclick="setMode('single',this)">Single</button>
       <button class="tab" onclick="setMode('spritesheet',this)">Sheet</button>
       <button class="tab" onclick="setMode('frames',this)">Frames</button>
+      <button class="tab" onclick="setMode('layers',this)">Layers</button>
     </div>
   </div>
   <div class="sec">
@@ -59,6 +57,12 @@
       <div class="field"><label>Frames</label><input type="number" id="frameCount" value="16" min="1" max="512" oninput="parseSheet()"></div>
       <div class="field"><label>Start</label><input type="number" id="startFrame" value="0" min="0" oninput="parseSheet()"></div>
     </div>
+  </div>
+  <div class="sec" id="layersCfg" style="display:none">
+    <div class="sec-lbl"><span class="mi">layers</span><span data-i18n="layers_sec">Layers</span> (<span id="layerCount">0</span>)</div>
+    <div class="info-box" style="margin-bottom:8px;font-size:10px" data-i18n="layers_hint">Add several images as layers. Each gets its own normal map — preview one at a time or blend them all together.</div>
+    <div class="layer-list" id="layerList"></div>
+    <button class="add-light-btn" onclick="$('fileInput').click()"><span class="mi">add_photo_alternate</span><span data-i18n="add_layer">Add layer</span></button>
   </div>
   <div class="hdiv"></div>
 
@@ -81,6 +85,12 @@
 
     <!-- X engine sliders -->
     <div id="xPanel" style="display:none">
+      <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:5px;font-weight:500" data-i18n="presets">Presets</label>
+      <div class="chk-group" style="margin-bottom:12px">
+        <div class="chk" onclick="setXPreset('soft')">Soft</div>
+        <div class="chk" onclick="setXPreset('balanced')">Balanced</div>
+        <div class="chk" onclick="setXPreset('crisp')">Crisp</div>
+      </div>
       <div class="sl-row"><span>Detail <i class="tip-icon" data-tip="sXDetail">i</i></span><span class="sl-val" id="vXDetail">0.50</span></div>
       <input type="range" min="0" max="1.5" step="0.05" value="0.5" id="sXDetail" oninput="sv('vXDetail',this,2);LP()">
       <div class="sl-row"><span>Volume <i class="tip-icon" data-tip="sXVolume">i</i></span><span class="sl-val" id="vXVolume">0.60</span></div>
@@ -89,6 +99,8 @@
       <input type="range" min="0" max="1" step="0.05" value="0.4" id="sXShape" oninput="sv('vXShape',this,2);LP()">
       <div class="sl-row"><span>Smooth <i class="tip-icon" data-tip="sXSmooth">i</i></span><span class="sl-val" id="vXSmooth">0.30</span></div>
       <input type="range" min="0" max="0.9" step="0.05" value="0.3" id="sXSmooth" oninput="sv('vXSmooth',this,2);LP()">
+      <div class="sl-row"><span>Micro contrast <i class="tip-icon" data-tip="sXCrisp">i</i></span><span class="sl-val" id="vXCrisp">0.25</span></div>
+      <input type="range" min="0" max="1" step="0.05" value="0.25" id="sXCrisp" oninput="sv('vXCrisp',this,2);LP()">
     </div>
 
     <div id="classicPanel">
@@ -204,6 +216,7 @@
     <div class="exp-row" onclick="exportSingle()"><span class="mi">image</span><div class="exp-txt"><b>Normal map PNG</b><span>Current frame</span></div></div>
     <div class="exp-row" id="expSheet" onclick="exportSpritesheet()" style="display:none"><span class="mi">grid_view</span><div class="exp-txt"><b>Normal spritesheet</b><span>Same grid</span></div></div>
     <div class="exp-row" id="expAll" onclick="exportAll()" style="display:none"><span class="mi">folder_zip</span><div class="exp-txt"><b>All frames</b><span>Individual PNGs</span></div></div>
+    <div class="exp-row" onclick="exportGodotPackage()"><span class="mi">inventory_2</span><div class="exp-txt"><b data-i18n="godot_pkg">Godot package</b><span data-i18n="godot_pkg_desc">Sprite + normal map + import + lights script</span></div></div>
     <div class="exp-row" onclick="copyGodot()"><span class="mi">code</span><div class="exp-txt"><b>Godot 4 snippet</b><span>Copy</span></div></div>
     <div class="exp-row" onclick="copyGodotImport()"><span class="mi">settings_applications</span><div class="exp-txt"><b data-i18n="godot_import">Godot .import file</b><span data-i18n="import_desc">Ready-to-use import config</span></div></div>
     <div class="exp-row" onclick="exportTilesheet()"><span class="mi">dashboard</span><div class="exp-txt"><b data-i18n="tilesheet">Tilesheet (custom grid)</b><span data-i18n="tilesheet_desc">Pack frames into tiles</span></div></div>
@@ -223,7 +236,6 @@
   <button class="mnav" id="mnavGen" onclick="openSheet('shGen',this)"><span class="mi">blur_on</span>Adjust</button>
   <button class="mnav" id="mnavAO" onclick="openSheet('shAO',this)"><span class="mi">blur_circular</span>AO</button>
   <button class="mnav" id="mnavLights" onclick="openSheet('shLights',this)"><span class="mi">wb_incandescent</span><span data-i18n="lights">Lights</span></button>
-  <button class="mnav" onclick="openSpin()"><span class="mi">3d_rotation</span>Spin</button>
   <button class="mnav" id="mnavExport" onclick="openSheet('shExport',this)"><span class="mi">download</span><span data-i18n="export">Export</span></button>
 </div></nav>
 
@@ -234,9 +246,10 @@
     <button class="tab on" onclick="setMode('single',this);closeSheet()">Single</button>
     <button class="tab" onclick="setMode('spritesheet',this);closeSheet()">Sheet</button>
     <button class="tab" onclick="setMode('frames',this);closeSheet()">Frames</button>
+    <button class="tab" onclick="setMode('layers',this)">Layers</button>
   </div>
   <div class="drop" style="margin-bottom:10px">
-    <input type="file" id="fileInputM" accept="image/*" onchange="handleFiles(this.files);closeSheet()">
+    <input type="file" id="fileInputM" accept="image/*" onchange="handleFiles(this.files);if(App.mode!=='layers')closeSheet()">
     <span class="mi">upload_file</span><p><b>Tap to load image</b><br>PNG · WebP</p>
   </div>
   <div id="shSheetCfg" style="display:none">
@@ -246,6 +259,11 @@
       <div class="field"><label>Frames</label><input type="number" id="mFC" value="16" min="1" oninput="syncSheet()"></div>
       <div class="field"><label>Start</label><input type="number" id="mSF" value="0" min="0" oninput="syncSheet()"></div>
     </div>
+  </div>
+  <div id="shLayersCfg" style="display:none">
+    <div class="sec-lbl" style="margin-bottom:8px"><span class="mi">layers</span><span data-i18n="layers_sec">Layers</span> (<span id="layerCountM">0</span>)</div>
+    <div class="info-box" style="margin-bottom:8px;font-size:10px" data-i18n="layers_hint">Add several images as layers. Each gets its own normal map — preview one at a time or blend them all together.</div>
+    <div class="layer-list" id="layerListM"></div>
   </div>
 </div></div>
 
@@ -269,6 +287,12 @@
   <div class="sl-row"><span>Z Range</span><span class="sl-val" id="mvZ">0.50</span></div>
   <input type="range" min="0.05" max="1" step="0.05" value="0.5" id="msZ" oninput="msync('msZ','sZ','mvZ','vZ',2);LP()">
   <div id="mXPanel" style="display:none">
+    <label style="display:block;font-size:10px;color:var(--muted);margin-bottom:5px" data-i18n="presets">Presets</label>
+    <div class="chk-group" style="margin-bottom:12px">
+      <div class="chk" onclick="setXPreset('soft')">Soft</div>
+      <div class="chk" onclick="setXPreset('balanced')">Balanced</div>
+      <div class="chk" onclick="setXPreset('crisp')">Crisp</div>
+    </div>
     <div class="sl-row"><span>Detail</span><span class="sl-val" id="mvXDetail">0.50</span></div>
     <input type="range" min="0" max="1.5" step="0.05" value="0.5" id="msXDetail" oninput="msync('msXDetail','sXDetail','mvXDetail','vXDetail',2);LP()">
     <div class="sl-row"><span>Volume</span><span class="sl-val" id="mvXVolume">0.60</span></div>
@@ -277,6 +301,8 @@
     <input type="range" min="0" max="1" step="0.05" value="0.4" id="msXShape" oninput="msync('msXShape','sXShape','mvXShape','vXShape',2);LP()">
     <div class="sl-row"><span>Smooth</span><span class="sl-val" id="mvXSmooth">0.30</span></div>
     <input type="range" min="0" max="0.9" step="0.05" value="0.3" id="msXSmooth" oninput="msync('msXSmooth','sXSmooth','mvXSmooth','vXSmooth',2);LP()">
+    <div class="sl-row"><span>Micro contrast</span><span class="sl-val" id="mvXCrisp">0.25</span></div>
+    <input type="range" min="0" max="1" step="0.05" value="0.25" id="msXCrisp" oninput="msync('msXCrisp','sXCrisp','mvXCrisp','vXCrisp',2);LP()">
   </div>
   <div class="field" style="margin:4px 0 10px">
     <label>Filter</label>
@@ -310,6 +336,7 @@
   <div class="sec-lbl" style="margin-bottom:8px"><span class="mi">download</span><span data-i18n="export">Export</span></div>
   <div class="exp-row" onclick="exportSingle();closeSheet()"><span class="mi">image</span><div class="exp-txt"><b>Normal map PNG</b><span>Current frame</span></div></div>
   <div class="exp-row" id="expSheetM" onclick="exportSpritesheet();closeSheet()" style="display:none"><span class="mi">grid_view</span><div class="exp-txt"><b>Normal spritesheet</b><span>Same grid</span></div></div>
+  <div class="exp-row" onclick="exportGodotPackage();closeSheet()"><span class="mi">inventory_2</span><div class="exp-txt"><b data-i18n="godot_pkg">Godot package</b><span data-i18n="godot_pkg_desc">Sprite + normal map + import + lights script</span></div></div>
   <div class="exp-row" onclick="copyGodot();closeSheet()"><span class="mi">code</span><div class="exp-txt"><b>Godot 4 snippet</b></div></div>
 </div></div>
 
@@ -362,117 +389,12 @@
   </div>
 </div>
 
-<!-- SUPPORT MODAL -->
-<div class="modal-bg" id="supportModal">
-  <div class="modal" style="max-width:400px">
-    <div class="modal-hdr"><span class="mi">favorite</span><h3>Support Normal-Godot</h3>
-      <button class="modal-close" onclick="closeSupport()"><span class="mi">close</span></button></div>
-    <div class="modal-body">
-      <div class="info-box" style="margin-bottom:14px;font-size:11px">
-        Normal-Godot is free and open. If it saves you time, consider supporting development 🙏
-      </div>
-      <div class="support-grid">
-        <div class="support-item">
-          <span class="si-icon">💳</span>
-          <span class="si-name">DonationAlerts</span>
-          <span class="si-desc">One-time donation</span>
-          <span class="soon">SOON</span>
-        </div>
-        <div class="support-item">
-          <span class="si-icon">🚀</span>
-          <span class="si-name">Boosty</span>
-          <span class="si-desc">Updates & news</span>
-          <span class="soon">SOON</span>
-        </div>
-        <div class="support-item">
-          <span class="si-icon">₿</span>
-          <span class="si-name">Crypto</span>
-          <span class="si-desc">BTC / ETH / TON</span>
-          <span class="soon">SOON</span>
-        </div>
-      </div>
-      <div class="support-note">Links coming soon. Stay tuned on Boosty for updates!</div>
-    </div>
-  </div>
-</div>
-
 <!-- RECENT MODAL -->
 <div class="modal-bg" id="recentModal">
   <div class="modal">
     <div class="modal-hdr"><span class="mi">history</span><h3>Recent normals</h3>
       <button class="modal-close" onclick="$('recentModal').classList.remove('open')"><span class="mi">close</span></button></div>
     <div class="modal-body"><div class="recent-grid" id="recentList"></div></div>
-  </div>
-</div>
-
-<!-- SPIN OVERLAY -->
-<div class="fullov" id="spinOverlay">
-  <div class="ov-bar">
-    <button class="ov-back" onclick="closeSpin()"><span class="mi">arrow_back</span></button>
-    <span class="ov-title"><span class="mi" style="font-size:15px;vertical-align:-2px">3d_rotation</span> <span data-i18n="preview_title">Advanced Preview</span></span>
-  </div>
-  <div class="spin-body">
-    <div class="spin-stage">
-      <canvas id="spinCv" onmousedown="spinCenterPick(event)" ontouchstart="spinCenterPick(event)"></canvas>
-      <div class="center-marker" id="centerMarker" style="display:none"></div>
-    </div>
-    <div class="spin-controls">
-      <div class="sec-lbl"><span class="mi">image</span>Source</div>
-      <button class="btn btn-act" style="margin-bottom:6px" onclick="spinUseCurrent()"><span class="mi">blur_on</span>Use current generated</button>
-      <button class="btn btn-act" style="margin-bottom:6px" onclick="spinFromRecent()"><span class="mi">history</span>From recent</button>
-      <div class="drop" style="padding:10px;margin-bottom:6px">
-        <input type="file" accept="image/*" onchange="spinFileSprite(this.files)">
-        <span class="mi" style="font-size:18px">image</span>
-        <p style="font-size:10px"><b>Sprite from file</b><br><span id="spinSpriteName" style="color:var(--dim)"></span></p>
-      </div>
-      <div class="drop" style="padding:10px;margin-bottom:12px">
-        <input type="file" accept="image/*" onchange="spinFileNormal(this.files)">
-        <span class="mi" style="font-size:18px">imagesearch_roller</span>
-        <p style="font-size:10px"><b>Normal from file</b><br><span id="spinNormalName" style="color:var(--dim)"></span></p>
-      </div>
-      <div class="sec-lbl"><span class="mi">center_focus_strong</span>Rotation center</div>
-      <div class="seg" style="margin-bottom:6px">
-        <button class="on" id="centerAuto" onclick="spinSetCenterMode('auto')">Auto</button>
-        <button id="centerManual" onclick="spinSetCenterMode('manual')">Manual</button>
-      </div>
-      <div id="centerPickHint" style="display:none;font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5">Tap the preview to set rotation center.</div>
-      <div class="sec-lbl"><span class="mi">settings</span>Animation</div>
-      <div class="field" style="margin-bottom:8px">
-        <label>Spin mode</label>
-        <div class="seg">
-          <button class="on" id="spinModeObj" onclick="spinSetMode('object')">Sprite spins</button>
-          <button id="spinModeLight" onclick="spinSetMode('light')">Light orbits</button>
-        </div>
-      </div>
-      <div class="sl-row"><span>Speed</span><span class="sl-val" id="vSpinSpeed">1.0</span></div>
-      <input type="range" id="spinSpeed" min="0.1" max="5" step="0.1" value="1" oninput="sv('vSpinSpeed',this,1)">
-      <div class="sl-row"><span>Video duration (s)</span><span class="sl-val" id="vSpinDur">3</span></div>
-      <input type="range" id="spinDuration" min="1" max="10" step="1" value="3" oninput="sv('vSpinDur',this,0)">
-      <div class="sec-lbl" style="margin-top:8px"><span class="mi">palette</span>Background</div>
-      <div class="bg-swatch">
-        <input type="color" id="spinBgColor" value="#808080" oninput="spinSetBg(this.value)">
-        <span style="font-size:11px;color:var(--muted)">Video / PNG background</span>
-      </div>
-      <div class="tog-row">
-        <span>Transparent</span>
-        <div class="tog" id="spinBgTransp" onclick="spinToggleTransparent(this)"></div>
-      </div>
-      <div class="sec-lbl"><span class="mi">wb_incandescent</span><span data-i18n="lights">Lights</span></div>
-      <div id="spinLightList"></div>
-      <button class="add-light-btn" style="margin-bottom:12px" onclick="spinAddLight()"><span class="mi">add</span>Add light</button>
-      <div class="sec-lbl"><span class="mi">download</span><span data-i18n="export">Export</span></div>
-      <button class="btn btn-act" style="margin-bottom:6px" onclick="spinExportPNG()"><span class="mi">image</span>PNG (500×500)</button>
-      <button class="btn btn-act" id="spinRecBtn" onclick="spinExportVideo()"><span class="mi">videocam</span>Record video</button>
-    </div>
-  </div>
-</div>
-
-<!-- Spin recent -->
-<div class="modal-bg" id="spinRecentModal">
-  <div class="modal">
-    <div class="modal-hdr"><span class="mi">history</span><h3>Recent normals</h3>
-      <button class="modal-close" onclick="$('spinRecentModal').classList.remove('open')"><span class="mi">close</span></button></div>
-    <div class="modal-body"><div class="recent-grid" id="spinRecentList"></div></div>
   </div>
 </div>
 
@@ -497,8 +419,8 @@
 <script src="core.js"></script>
 <script src="generate.js"></script>
 <script src="lights.js"></script>
+<script src="layers.js"></script>
 <script src="ao.js"></script>
-<script src="spin.js"></script>
 <script src="ui.js"></script>
 </body>
 </html>
