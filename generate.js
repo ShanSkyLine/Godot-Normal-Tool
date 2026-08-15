@@ -25,7 +25,7 @@ function loadOne(file){
   const r = new FileReader();
   r.onload = e => { const img = new Image(); img.onload = () => {
     App.sheetSrc = img; App.customNormal = null; $('clearNormalBtn').style.display = 'none';
-    if (App.mode === 'spritesheet') parseSheet(); else { App.frames = [{ canvas: toC(img) }]; processAll(); }
+    if (App.mode === 'spritesheet') parseSheet(); else { App.frames = [{ canvas: toCanvasSized(img) }]; processAll(); }
   }; img.src = e.target.result; };
   r.readAsDataURL(file);
 }
@@ -33,7 +33,7 @@ function loadMulti(files){
   App.frames = new Array(files.length); let done = 0;
   files.forEach((f, i) => { const r = new FileReader();
     r.onload = e => { const img = new Image(); img.onload = () => {
-      App.frames[i] = { canvas: toC(img) }; if (++done === files.length) processAll();
+      App.frames[i] = { canvas: toCanvasSized(img) }; if (++done === files.length) processAll();
     }; img.src = e.target.result; }; r.readAsDataURL(f); });
 }
 function parseSheet(){
@@ -82,7 +82,7 @@ function clearCustomNormal(){
 // ── generation pipeline ──
 async function processAll(){
   if (!App.frames.length) return;
-  setStatus('proc', 'Processing…'); showProg(true); App.normalFrames = [];
+  setStatus('proc', t('status_processing')); showProg(true); App.normalFrames = [];
   for (let i = 0; i < App.frames.length; i++){
     setProg((i / App.frames.length) * 100);
     await new Promise(r => setTimeout(r, 0));
@@ -95,7 +95,7 @@ async function processAll(){
   const m = App.frames.length > 1;
   ['expSheet','expSheetM','expAll'].forEach(id => { const e = $(id); if (e) e.style.display = m ? 'flex' : 'none'; });
   $('playBtn').style.display = m ? 'flex' : 'none';
-  setStatus('rdy', `Ready · ${App.frames.length} frame${m ? 's' : ''}`);
+  setStatus('rdy', `${t('status_ready_prefix')} · ${App.frames.length} ${pluralFrames(App.frames.length)}`);
   try { saveRecentNormal(App.normalFrames[0], App.frames[0].canvas); } catch(e){}
 }
 
@@ -153,8 +153,18 @@ function genNormalClassic(src){
 function renderLit(){
   if (!App.frames.length) return;
   const src = App.frames[App.curFrame].canvas;
-  const nd = App.customNormal || App.normalFrames[App.curFrame]; if (!nd) return;
   const w = src.width, h = src.height;
+  // A loaded/generated custom normal map is tied to one specific snapshot
+  // of the artwork. If the base image has since changed size — a layer was
+  // moved/toggled, a different frame is selected, Fill was applied before
+  // the composite resized — reading it against the new dimensions would
+  // misalign every row (classic stride-mismatch banding/shearing). Drop it
+  // instead of rendering garbage.
+  if (App.customNormal && (App.customNormal.width !== w || App.customNormal.height !== h)){
+    App.customNormal = null;
+    const btn = $('clearNormalBtn'); if (btn) btn.style.display = 'none';
+  }
+  const nd = App.customNormal || App.normalFrames[App.curFrame]; if (!nd) return;
   const cl = $('cvLit'); cl.width = w; cl.height = h;
   const ctx = cl.getContext('2d');
   const sd = src.getContext('2d').getImageData(0, 0, w, h);
@@ -162,7 +172,10 @@ function renderLit(){
   const PL = App.lights.filter(l => l.enabled).map(l => {
     const lr = parseInt(l.color.slice(1,3),16)/255, lg = parseInt(l.color.slice(3,5),16)/255, lb = parseInt(l.color.slice(5,7),16)/255;
     const ll = Math.sqrt(l.x**2+l.y**2+l.z**2) || 1;
-    return { r:lr, g:lg, b:lb, int:l.intensity, lx:l.x/ll, ly:l.y/ll, lz:l.z/ll };
+    const highlight = l.highlight != null ? l.highlight : 0.45;
+    const wrap = l.softness != null ? l.softness : 0;
+    return { r:lr, g:lg, b:lb, int:l.intensity, lx:l.x/ll, ly:l.y/ll, lz:l.z/ll,
+      wrap, specPow: 4 + highlight*60, specStrength: highlight*0.6 };
   });
   const AMB = 0.14;
   for (let i = 0; i < w*h; i++){
@@ -171,9 +184,14 @@ function renderLit(){
     const a = sd.data[idx+3]; if (a === 0){ out.data[idx+3]=0; continue; }
     let tr=AMB, tg=AMB, tb=AMB;
     PL.forEach(L => {
-      const diff = Math.max(0, nx*L.lx+ny*L.ly+nz*L.lz) * L.int;
+      // wrap lighting: L.wrap=0 is a hard Lambertian cutoff (classic sharp
+      // terminator), L.wrap=1 lets light wrap almost all the way around the
+      // form — this is what actually makes "Soft" look soft and "Hard" look
+      // hard, not just a brightness change.
+      const ndotl = nx*L.lx+ny*L.ly+nz*L.lz;
+      const diff = Math.max(0, (ndotl+L.wrap)/(1+L.wrap)) * L.int;
       const hx=L.lx, hy=L.ly, hz=L.lz+1, hl=Math.sqrt(hx*hx+hy*hy+hz*hz)||1;
-      const sp = Math.pow(Math.max(0, nx*(hx/hl)+ny*(hy/hl)+nz*(hz/hl)), 24) * 0.35 * L.int;
+      const sp = Math.pow(Math.max(0, nx*(hx/hl)+ny*(hy/hl)+nz*(hz/hl)), L.specPow) * L.specStrength * L.int;
       tr += diff*L.r+sp*L.r; tg += diff*L.g+sp*L.g; tb += diff*L.b+sp*L.b;
     });
     out.data[idx]   = Math.min(255, sd.data[idx]   * tr * 1.25);
@@ -188,13 +206,21 @@ function renderLit(){
 // ── zoom ──
 function applyZoomToCanvas(id, w, h){
   const c = $(id);
+  // Only the width is pinned; height is left to the browser to derive from
+  // the canvas's own intrinsic aspect ratio (its real width/height
+  // attributes, set elsewhere to the true pixel size). This guarantees
+  // proportions survive any later CSS constraint (e.g. a mobile max-width
+  // cap) instead of two independently-clamped pixel values silently
+  // squashing non-square sprites — the bug this replaced.
   c.style.width = Math.round(w*App.zoomScale)+'px';
-  c.style.height = Math.round(h*App.zoomScale)+'px';
+  c.style.height = 'auto';
 }
 function applyZoom(){
   if (!App.frames.length) return;
   const w = App.frames[App.curFrame].canvas.width, h = App.frames[App.curFrame].canvas.height;
   ['cvOrig','cvNorm','cvLit'].forEach(id => applyZoomToCanvas(id, w, h));
+  // AO canvas keeps its own dimensions but must follow the same zoom (bug fix)
+  if (typeof aoFrame !== 'undefined' && aoFrame) applyZoomToCanvas('cvAO', aoFrame.width, aoFrame.height);
   $('zval').textContent = Math.round(App.zoomScale*100)+'%';
 }
 function zoom(d){
@@ -203,11 +229,23 @@ function zoom(d){
   App.zoomScale = steps[Math.max(0, Math.min(steps.length-1, (c===-1?5:c)+d))];
   App.zoomAuto = false; applyZoom();
 }
+// how many preview boxes are visible at once — used to fit them all on
+// screen together (split=2, single views=1, custom=however many are on)
+function visibleBoxCount(){
+  if (App.viewMode==='split') return (typeof aoEnabled!=='undefined' && aoEnabled) ? 3 : 2;
+  if (App.viewMode==='custom'){
+    const cv = App.combinedViews && App.combinedViews.length ? App.combinedViews : ['orig','norm'];
+    let n = cv.filter(x => x==='orig'||x==='norm'||x==='lit').length;
+    if (cv.includes('ao') && typeof aoEnabled!=='undefined' && aoEnabled) n++;
+    return Math.max(1, n);
+  }
+  return (App.viewMode==='norm' && typeof aoEnabled!=='undefined' && aoEnabled) ? 2 : 1;
+}
 function zoomFit(){
   if (!App.frames.length) return;
   const cw = $('cw'), aw = cw.clientWidth-40, ah = cw.clientHeight-40;
   const fw = App.frames[App.curFrame].canvas.width, fh = App.frames[App.curFrame].canvas.height;
-  const boxes = App.viewMode==='split' ? 2 : 1, tw = fw*boxes+(boxes-1)*16;
+  const boxes = visibleBoxCount(), tw = fw*boxes+(boxes-1)*16;
   App.zoomScale = Math.max(0.1, Math.min(8, Math.min(aw/tw, ah/fh)));
   App.zoomAuto = false; applyZoom();
 }
@@ -218,7 +256,7 @@ function autoZoom(){
   if (fw < 200 || fh < 200) App.zoomScale = Math.min(8, 200/Math.min(fw, fh));
   else {
     const cw = $('cw'), aw = cw.clientWidth-40, ah = cw.clientHeight-40;
-    const boxes = App.viewMode==='split' ? 2 : 1, tw = fw*boxes+(boxes-1)*16;
+    const boxes = visibleBoxCount(), tw = fw*boxes+(boxes-1)*16;
     App.zoomScale = Math.max(0.1, Math.min(8, Math.min(aw/tw, ah/fh)));
   }
   $('zval').textContent = Math.round(App.zoomScale*100)+'%';
@@ -229,18 +267,39 @@ function updateDisplay(){
   if (!App.frames.length || !App.normalFrames.length) return;
   $('emptyState').style.display = 'none';
   $('previews').style.display = 'flex';
-  const src = App.frames[App.curFrame].canvas, nd = App.normalFrames[App.curFrame], w = src.width, h = src.height;
+  const src = App.frames[App.curFrame].canvas,
+    // The Normal viewport must show the map currently used for lighting too.
+    // Previously a custom map was only visible in the Lit viewport.
+    nd = App.customNormal || App.normalFrames[App.curFrame], w = src.width, h = src.height;
   const co = $('cvOrig'); co.width = w; co.height = h; co.getContext('2d').drawImage(src, 0, 0);
   const cn = $('cvNorm'); cn.width = w; cn.height = h; cn.getContext('2d').putImageData(nd, 0, 0);
   renderLit();
   if (App.zoomAuto) autoZoom(); applyZoom(); applyView();
 }
 function applyView(){
+  // an AO map is a snapshot tied to one composite — if the base image has
+  // since changed size (layer moved/toggled, different frame selected,
+  // project switched) it's stale, so drop it rather than show a mismatched
+  // overlay next to the current artwork
+  if (typeof aoFrame !== 'undefined' && aoFrame && App.frames.length){
+    const cur = App.frames[App.curFrame].canvas;
+    if (aoFrame.width !== cur.width || aoFrame.height !== cur.height){
+      aoFrame = null; aoEnabled = false;
+      const ex = $('aoExportBtn'); if (ex) ex.style.display = 'none';
+    }
+  }
   const b = { boxOrig:false, boxNorm:false, boxLit:false, boxAO:false };
   if (App.viewMode==='split'){ b.boxOrig=b.boxNorm=true; b.boxAO = (typeof aoEnabled!=='undefined' && aoEnabled); }
   else if (App.viewMode==='orig') b.boxOrig=true;
   else if (App.viewMode==='norm'){ b.boxNorm=true; b.boxAO = (typeof aoEnabled!=='undefined' && aoEnabled); }
   else if (App.viewMode==='lit') b.boxLit=true;
+  else if (App.viewMode==='custom'){
+    // Project Settings → "combined view": show any mix of panels together,
+    // instead of the fixed Split/Orig/Normal/Lit single choices
+    const cv = App.combinedViews && App.combinedViews.length ? App.combinedViews : ['orig','norm'];
+    b.boxOrig = cv.includes('orig'); b.boxNorm = cv.includes('norm'); b.boxLit = cv.includes('lit');
+    b.boxAO = cv.includes('ao') && (typeof aoEnabled!=='undefined' && aoEnabled);
+  }
   Object.keys(b).forEach(k => { const e=$(k); if (e) e.style.display = b[k] ? 'flex' : 'none'; });
 }
 
@@ -259,22 +318,27 @@ function buildStrip(){
   });
 }
 function selectFrame(i){
+  // AO is generated for a single frame — moving to another frame of the
+  // same size would otherwise keep showing the stale map (bug fix)
+  if (App.curFrame !== i && typeof clearAO === 'function') clearAO();
   App.curFrame = i; qsa('.fthumb').forEach((el, j) => el.classList.toggle('on', j===i)); updateDisplay();
+}
+function restartPlayIv(){
+  clearInterval(App.playIv);
+  const fps = Math.max(1, Math.min(60, +$('fpsIn').value || 8));
+  App.playIv = setInterval(() => { App.curFrame = (App.curFrame+1) % App.frames.length; selectFrame(App.curFrame); }, 1000/fps);
 }
 function togglePlay(){
   App.playing = !App.playing;
   $('playIco').textContent = App.playing ? 'pause' : 'play_arrow';
-  $('playTxt').textContent = App.playing ? 'Pause' : 'Play';
-  if (App.playing){ const fps = +$('fpsIn').value || 8;
-    App.playIv = setInterval(() => { App.curFrame = (App.curFrame+1) % App.frames.length; selectFrame(App.curFrame); }, 1000/fps);
-  } else clearInterval(App.playIv);
+  $('playTxt').textContent = App.playing ? t('pause_label') : t('play_label');
+  if (App.playing) restartPlayIv(); else clearInterval(App.playIv);
 }
 
 // ── modes / views / filters ──
 function setMode(m, btn){
-  App.mode = m; qsa('.tab').forEach(el => el.classList.remove('on'));
-  qsa('.tab').forEach(el => { const t = el.textContent.trim().toLowerCase();
-    if ((m==='single'&&t==='single')||(m==='spritesheet'&&t==='sheet')||(m==='frames'&&t==='frames')||(m==='layers'&&t==='layers')) el.classList.add('on'); });
+  App.mode = m;
+  qsa('.tab').forEach(el => el.classList.toggle('on', el.dataset.mode === m));
   const sh = m==='spritesheet', ly = m==='layers';
   ['sheetCfg','shSheetCfg'].forEach(id => { const e = $(id); if (e) e.style.display = sh ? 'block' : 'none'; });
   ['layersCfg','shLayersCfg'].forEach(id => { const e = $(id); if (e) e.style.display = ly ? 'block' : 'none'; });
@@ -309,6 +373,15 @@ function resetGen(){
   ['msStr','msLevel','msBlur','msZ'].forEach((id, i) => { const e = $(id); if (e) e.value = [2.5,7,1,0.5][i]; });
   App.invert = { r:false, g:false, h:false };
   ['invR','invG','invH','mInvR','mInvG','mInvH'].forEach(id => { const e = $(id); if (e) e.classList.remove('on'); });
+  // Experimental-engine sliders were previously left untouched (bug fix)
+  const dx = { sXDetail:0.5, sXVolume:0.6, sXShape:0.4, sXSmooth:0.3, sXCrisp:0.25 };
+  Object.entries(dx).forEach(([id, v]) => {
+    const e = $(id), me = $('m'+id.charAt(0)+id.slice(1)); if (e) e.value = v;
+    const ms = $('ms'+id.slice(1)); if (ms) ms.value = v;
+    sv('v'+id.slice(1), {value:v}, 2);
+    const mv = $('mv'+id.slice(1)); if (mv) sv('mv'+id.slice(1), {value:v}, 2);
+  });
+  setXMode('sprite');
   setFilter('sobel'); LP(); toast(t('reset_done'));
 }
 
@@ -371,7 +444,7 @@ function godotLightsBody(){
   }).join('\n');
 }
 function copyGodot(){
-  const s = `# Normal-Godot — Godot 4
+  const s = `# NormEngine — Godot 4
 # 1. Import the normal map PNG as a Texture2D
 # 2. Sprite2D -> CanvasItemMaterial -> Normal Map -> assign the texture
 # 3. Lights matching your current preview:
@@ -382,12 +455,11 @@ ${godotLightsBody().replace(/\t/g, '')}`;
 // ════════════ FILL NORMALS TOOL ════════════
 function openFill(){
   if (!App.frames.length){ toast(t('load_sprite_first'));
-    $('htabGen').classList.add('on'); $('htabFill').classList.remove('on'); return; }
+    setActiveTab('htabGen'); return; }
   $('fillModal').classList.add('open'); renderFillPreview();
 }
 function closeFill(){
   $('fillModal').classList.remove('open');
-  $('htabGen').classList.add('on'); $('htabFill').classList.remove('on');
 }
 function setFillShape(s, btn){
   App.fillShape = s; $('fillRadial').classList.toggle('on', s==='radial');
@@ -426,6 +498,7 @@ function renderFillPreview(){
 function applyFill(){
   if (!App.frames.length) return; App.customNormal = genFill();
   $('clearNormalBtn').style.display = 'flex'; closeFill();
+  setActiveTab('htabGen');
   setView('lit', document.querySelector('.vtab:nth-child(4)')); renderLit(); applyView(); toast(t('fill_applied'));
 }
 function downloadFill(){
@@ -492,7 +565,7 @@ normal_texture = ExtResource("2")
 }
 function godotLightsScript(){
   return `extends Node
-# Generated by Normal-Godot — recreates the lights from your preview.
+# Generated by NormEngine — recreates the lights from your preview.
 # Attach this to the Sprite2D (or a parent Node2D) and call setup_lights()
 # from _ready(), or copy the body into your own script.
 
@@ -501,7 +574,7 @@ ${godotLightsBody()}
 `;
 }
 function godotReadme(name){
-  return `Normal-Godot export package
+  return `NormEngine export package
 ============================
 
 Files in this package:
@@ -521,7 +594,7 @@ Setup in Godot 4:
   4. Attach ${name}_lights.gd to the Sprite2D (or a parent Node2D), then
      call setup_lights() from _ready() - or copy its body into your own script.
 
-Generated by Normal-Godot beta.
+Generated by NormEngine beta.
 `;
 }
 async function exportGodotPackage(){
@@ -634,6 +707,36 @@ function scharrGrad(H, w, h, step){
   return {DX,DY};
 }
 
+
+// ── wrap-aware helpers for TEXTURE mode ──
+// Textures are usually tiled: clamped edges would print a visible seam line
+// into the normal map at every border. With wrap addressing the gradient at
+// x=0 "sees" x=w-1, so the exported map tiles seamlessly.
+function blurX(d, w, h, r, wrap){
+  if (!wrap) return blur(d, w, h, r);
+  let t = new Float32Array(d.length), o = new Float32Array(d.length);
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++){ let s=0;
+    for (let dx=-r;dx<=r;dx++) s += d[y*w + (((x+dx)%w)+w)%w];
+    t[y*w+x] = s/(2*r+1); }
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++){ let s=0;
+    for (let dy=-r;dy<=r;dy++) s += t[(((y+dy)%h)+h)%h*w + x];
+    o[y*w+x] = s/(2*r+1); }
+  return o;
+}
+function scharrGradX(H, w, h, step, wrap){
+  if (!wrap) return scharrGrad(H, w, h, step);
+  const S = (x,y) => H[(((y%h)+h)%h)*w + (((x%w)+w)%w)];
+  const DX = new Float32Array(w*h), DY = new Float32Array(w*h);
+  for (let y=0;y<h;y++) for (let x=0;x<w;x++){
+    const s00=S(x-step,y-step),s10=S(x,y-step),s20=S(x+step,y-step),
+          s01=S(x-step,y),                     s21=S(x+step,y),
+          s02=S(x-step,y+step),s12=S(x,y+step),s22=S(x+step,y+step);
+    DX[y*w+x]=(-3*s00-10*s01-3*s02+3*s20+10*s21+3*s22)/16;
+    DY[y*w+x]=(-3*s00-10*s10-3*s20+3*s02+10*s12+3*s22)/16;
+  }
+  return {DX,DY};
+}
+
 function genNormalX(src){
   const strength = +$('sStr').value;
   const zRange   = +$('sZ').value;
@@ -645,25 +748,39 @@ function genNormalX(src){
   const w = src.width, h = src.height;
   const pix = src.getContext('2d').getImageData(0, 0, w, h);
 
-  // 1. alpha-aware height (bleed instead of alpha-multiply → no silhouette halo)
-  // 10 iterations (up from 8) reaches further past the silhouette, further
-  // reducing gradient noise right at sprite edges.
-  const bled = bleedColors(pix, w, h, 10);
+  // Two data types, two pipelines:
+  //  · SPRITE  — game assets with an alpha silhouette (swords, characters):
+  //    bleed edge colors past the silhouette (no halo), optional volume dome
+  //    built from the silhouette shape, original alpha preserved.
+  //  · TEXTURE — tileable materials (stone, wood, fabric): treated as fully
+  //    opaque, no dome (there is no silhouette), and — when Seamless is on —
+  //    every convolution wraps around the edges so the map tiles cleanly.
+  const texMode = App.xMode === 'texture';
+  const wrap = texMode && App.xSeamless;
+
   let H = new Float32Array(w*h);
-  for (let i = 0; i < w*h; i++)
-    H[i] = (0.299*bled[i*4] + 0.587*bled[i*4+1] + 0.114*bled[i*4+2]) / 255;
+  if (texMode){
+    // 1t. plain luminance height — alpha is ignored for materials
+    for (let i = 0; i < w*h; i++)
+      H[i] = (0.299*pix.data[i*4] + 0.587*pix.data[i*4+1] + 0.114*pix.data[i*4+2]) / 255;
+  } else {
+    // 1s. alpha-aware height (bleed instead of alpha-multiply → no silhouette halo)
+    const bled = bleedColors(pix, w, h, 10);
+    for (let i = 0; i < w*h; i++)
+      H[i] = (0.299*bled[i*4] + 0.587*bled[i*4+1] + 0.114*bled[i*4+2]) / 255;
+  }
   if (App.invert.h) for (let i = 0; i < w*h; i++) H[i] = 1 - H[i];
 
   // 2. multi-scale octaves
-  const Hm = blur(H, w, h, 2);
-  const Hc = blur(H, w, h, 6);
-  const gF = scharrGrad(H,  w, h, 1);
-  const gM = scharrGrad(Hm, w, h, 2);
-  const gC = scharrGrad(Hc, w, h, 4);
+  const Hm = blurX(H, w, h, 2, wrap);
+  const Hc = blurX(H, w, h, 6, wrap);
+  const gF = scharrGradX(H,  w, h, 1, wrap);
+  const gM = scharrGradX(Hm, w, h, 2, wrap);
+  const gC = scharrGradX(Hc, w, h, 4, wrap);
 
-  // 3. optional dome component
+  // 3. optional dome component — silhouette volume only makes sense for sprites
   let gD = null;
-  if (shapeAmt > 0){
+  if (!texMode && shapeAmt > 0){
     const dome = domeHeight(pix, w, h);
     const Dn = new Float32Array(w*h);
     for (let i = 0; i < w*h; i++) Dn[i] = dome[i]/255;
@@ -686,7 +803,7 @@ function genNormalX(src){
 
   // 5. normal-field smoothing (rounds angular transitions)
   if (smooth > 0){
-    const TX = blur(NX,w,h,1), TY = blur(NY,w,h,1), TZ = blur(NZ,w,h,1);
+    const TX = blurX(NX,w,h,1,wrap), TY = blurX(NY,w,h,1,wrap), TZ = blurX(NZ,w,h,1,wrap);
     for (let i = 0; i < w*h; i++){
       let nx = NX[i]*(1-smooth)+TX[i]*smooth;
       let ny = NY[i]*(1-smooth)+TY[i]*smooth;
@@ -700,7 +817,7 @@ function genNormalX(src){
   // (step 5) rounds off fine surface texture; this restores crispness
   // without reintroducing the hard angular artifacts smoothing removed.
   if (crisp > 0){
-    const BX = blur(NX,w,h,2), BY = blur(NY,w,h,2);
+    const BX = blurX(NX,w,h,2,wrap), BY = blurX(NY,w,h,2,wrap);
     for (let i = 0; i < w*h; i++){
       let nx = NX[i] + (NX[i]-BX[i])*crisp*1.5;
       let ny = NY[i] + (NY[i]-BY[i])*crisp*1.5;
@@ -710,14 +827,14 @@ function genNormalX(src){
     }
   }
 
-  // 6. write with ORIGINAL alpha
+  // 6. sprite → original alpha; texture → fully opaque map
   const out = new Uint8ClampedArray(w*h*4);
   for (let i = 0; i < w*h; i++){
     const idx = i*4;
     out[idx]   = Math.round((NX[i]*.5+.5)*255);
     out[idx+1] = Math.round((NY[i]*.5+.5)*255);
     out[idx+2] = Math.round((NZ[i]*.5+.5)*255);
-    out[idx+3] = pix.data[idx+3];
+    out[idx+3] = texMode ? 255 : pix.data[idx+3];
   }
   return new ImageData(out, w, h);
 }
@@ -741,6 +858,29 @@ function setXPreset(name){
   vids.forEach((id,i) => sv(id, {value:vals[i]}, 2));
   mvids.forEach((id,i) => sv(id, {value:vals[i]}, 2));
   LP(); toast(t('preset_applied'));
+}
+// ── X engine target: sprite (game asset with alpha) vs texture (tileable material) ──
+function setXMode(m, btn){
+  App.xMode = m;
+  const on = (id, v) => { const e = $(id); if (e) e.classList.toggle('on', v); };
+  on('xModeSprite',  m==='sprite');  on('mXModeSprite',  m==='sprite');
+  on('xModeTexture', m==='texture'); on('mXModeTexture', m==='texture');
+  const shp = $('xShapeRow'), mshp = $('mXShapeRow'), seam = $('xSeamlessRow');
+  if (shp)  shp.style.display  = m==='texture' ? 'none' : 'block';
+  if (mshp) mshp.style.display = m==='texture' ? 'none' : 'block';
+  if (seam) seam.style.display = m==='texture' ? 'flex' : 'none';
+  const hint = $('xModeHint');
+  if (hint){
+    const key = m==='texture' ? 'x_texture_hint' : 'x_sprite_hint';
+    hint.dataset.i18n = key;              // so a language switch keeps the right hint
+    hint.textContent = t(key);
+  }
+  if (btn) LP();
+}
+function toggleSeamless(el){
+  App.xSeamless = !App.xSeamless;
+  if (el) el.classList.toggle('on', App.xSeamless);
+  LP();
 }
 function setEngine(e, btn){
   App.engine = e;

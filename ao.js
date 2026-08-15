@@ -46,11 +46,11 @@ function genAO(src){
 
 async function generateAO(){
   if(!App.frames.length){toast(t('load_sprite_first'));return;}
-  setStatus('proc','AO…');showProg(true);
+  setStatus('proc',t('status_ao_working'));showProg(true);
   await new Promise(r=>setTimeout(r,0));
   aoFrame=genAO(App.frames[App.curFrame].canvas);
   setProg(100);showProg(false);
-  setStatus('rdy','AO ready');
+  setStatus('rdy',t('status_ao_ready'));
   // draw in AO canvas
   const cv=$('cvAO');
   cv.width=aoFrame.width;cv.height=aoFrame.height;
@@ -60,6 +60,12 @@ async function generateAO(){
   $('boxAO').style.display='flex';
   applyZoomToCanvas('cvAO',aoFrame.width,aoFrame.height);
   toast(t('ao_ready'));
+}
+
+function clearAO(){
+  aoFrame = null; aoEnabled = false;
+  const ex = $('aoExportBtn'); if (ex) ex.style.display = 'none';
+  const box = $('boxAO'); if (box) box.style.display = 'none';
 }
 
 function exportAO(){

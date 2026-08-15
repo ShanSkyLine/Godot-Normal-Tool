@@ -28,7 +28,7 @@ function openSpin(){
 }
 function closeSpin(){
   Spin.open = false; cancelAnimationFrame(Spin.raf);
-  $('spinOverlay').classList.remove('open'); setActiveTab('htabGen');
+  $('spinOverlay').classList.remove('open');
 }
 function resizeSpin(){
   const cv = $('spinCv');
@@ -141,7 +141,7 @@ function rebuildSpinLights(){
     d.innerHTML = `
       <div class="spin-light-hdr">
         <div class="light-dot" style="background:${l.color}"></div>
-        <span>Light ${i+1}</span>
+        <span>${t('light_label')} ${i+1}</span>
         ${Spin.lights.length>1 ? `<button class="del-btn" onclick="Spin.lights.splice(${i},1);rebuildSpinLights()"><span class="mi">close</span></button>` : ''}
       </div>
       <div class="light-row">
@@ -149,21 +149,29 @@ function rebuildSpinLights(){
         <input type="range" min="0" max="2" step="0.05" value="${l.intensity}" style="flex:1;margin:0" oninput="Spin.lights[${i}].intensity=+this.value">
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
-        <label style="font-size:10px;color:var(--muted)">Orbit</label>
-        <div class="tog ${l.orbit?'on':''}" onclick="Spin.lights[${i}].orbit=!Spin.lights[${i}].orbit;rebuildSpinLights()" style="width:28px;height:16px"></div>
-        <label style="font-size:10px;color:var(--muted);margin-left:8px">Mirror</label>
-        <div class="tog ${l.mirror?'on':''}" onclick="Spin.lights[${i}].mirror=!Spin.lights[${i}].mirror" style="width:28px;height:16px"></div>
+        <label style="font-size:10px;color:var(--muted)">${t('spin_orbit')}</label>
+        <button type="button" class="tog ${l.orbit?'on':''}" aria-pressed="${l.orbit}" onclick="spinToggleLightOption(${i},'orbit')" style="width:28px;height:16px"></button>
+        <label style="font-size:10px;color:var(--muted);margin-left:8px">${t('spin_mirror')}</label>
+        <button type="button" class="tog ${l.mirror?'on':''}" aria-pressed="${l.mirror}" onclick="spinToggleLightOption(${i},'mirror')" style="width:28px;height:16px"></button>
       </div>
       <div style="display:flex;gap:8px;align-items:flex-start">
         <div class="spin-orbit-pad" id="sorbit-${i}">
           <div class="spin-orbit-center"></div>
           <div class="spin-orbit-dot" id="sodot-${i}" style="background:${l.color};left:${(l.x/2+.5)*100}%;top:${(-l.y/2+.5)*100}%"></div>
         </div>
-        <div style="font-size:9px;color:var(--muted);line-height:1.5">Drag to set<br>light position</div>
+        <div style="font-size:9px;color:var(--muted);line-height:1.5">${t('spin_drag_position')}</div>
       </div>`;
     el.appendChild(d);
     setTimeout(() => setupSpinOrbitPad(i), 0);
   });
+}
+function spinToggleLightOption(i, option){
+  const l = Spin.lights[i]; if (!l) return;
+  l[option] = !l[option];
+  // Orbit is meaningful in the light-orbit workspace. Switching it on now
+  // makes the requested motion start immediately instead of looking broken.
+  if (option === 'orbit' && l.orbit) spinSetMode('light');
+  rebuildSpinLights();
 }
 function spinAddLight(){
   if (Spin.lights.length >= 4){ toast(t('max_lights')); return; }
