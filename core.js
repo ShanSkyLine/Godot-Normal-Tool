@@ -9,21 +9,27 @@ const App = {
   normalFrames: [],    // [ImageData]
   curFrame: 0,
   viewMode: 'split',
+  combinedViews: ['orig','norm'], // Project Settings → which panels 'custom' view shows together
+  canvasSize: { mode:'auto', w:512, h:512 }, // Project Settings → fixed working canvas, or auto (native size)
   playing: false, playIv: null,
   lpTimer: null, sheetSrc: null,
   zoomScale: 1, zoomAuto: true,
   filterType: 'sobel',
   engine: 'classic',
+  xMode: 'sprite',     // experimental engine target: 'sprite' | 'texture'
+  xSeamless: true,     // texture mode: wrap-around convolutions for tileable maps
   invert: { r:false, g:false, h:false },
   customNormal: null,  // ImageData
   fillShape: 'radial',
-  lights: [{ id:1, name:'Main', color:'#ffffff', intensity:1.0, x:0.4, y:-0.4, z:0.82, enabled:true }],
+  lights: [{ id:1, name:'Main', color:'#ffffff', intensity:1.0, x:0.4, y:-0.4, z:0.82, enabled:true,
+    profile:'custom', softness:0.1, highlight:0.45 }],
   nextLightId: 2,
   recentPairs: [],     // {id,name,sprite,normal,w,h}
   layers: [],          // [{id,name,canvas,enabled,x,y,_normalCache}] — top of array = top of stack
   nextLayerId: 1,
   soloLayerId: null,   // null = combined view, otherwise preview a single layer
   layerW: 0, layerH: 0, layerOriginX: 0, layerOriginY: 0, // last composited layer canvas bounds
+  projects: [], activeProjectId: null, nextProjectId: 1,
 };
 const LC = ['#ffffff','#4488ff','#ff8844','#44ffaa','#ff44aa','#ffee44'];
 
@@ -39,6 +45,18 @@ function toC(img){
   const c = document.createElement('canvas');
   c.width = img.width; c.height = img.height;
   c.getContext('2d').drawImage(img, 0, 0); return c;
+}
+// Project Settings → Canvas size: 'auto' keeps native image size (toC above);
+// 'custom' places the sprite centered on a fixed working canvas instead —
+// used only where loading a fresh top-level sprite/frame makes sense
+// (single & frames modes), not for spritesheet cells or layers.
+function toCanvasSized(img){
+  if (!App.canvasSize || App.canvasSize.mode !== 'custom') return toC(img);
+  const cw = Math.max(1, App.canvasSize.w|0), ch = Math.max(1, App.canvasSize.h|0);
+  const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+  const dx = Math.round((cw - img.width)/2), dy = Math.round((ch - img.height)/2);
+  c.getContext('2d').drawImage(img, dx, dy);
+  return c;
 }
 function imgFromURL(url){
   return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
@@ -92,6 +110,19 @@ function toast(msg){
 // ── live preview debounce ──
 function LP(){
   clearTimeout(App.lpTimer);
+  // A generator control describes a generated map.  Once it is touched,
+  // return from a loaded/fill map so the requested change is visible.
+  if (App.customNormal){
+    App.customNormal = null;
+    const btn = $('clearNormalBtn'); if (btn) btn.style.display = 'none';
+  }
+  // Keep desktop and mobile generator controls coherent whichever surface was
+  // used.  The processing code reads the desktop controls.
+  [['sStr','msStr'],['sLevel','msLevel'],['sBlur','msBlur'],['sZ','msZ'],
+   ['sXDetail','msXDetail'],['sXVolume','msXVolume'],['sXShape','msXShape'],
+   ['sXSmooth','msXSmooth'],['sXCrisp','msXCrisp']].forEach(([desktop,mobile]) => {
+    const d=$(desktop), m=$(mobile); if (d && m) m.value=d.value;
+  });
   App.lpTimer = setTimeout(() => {
     if (App.mode === 'layers'){
       if (App.layers.length){ App.layers.forEach(l => { l._normalCache = null; }); recomputeLayers(); }
