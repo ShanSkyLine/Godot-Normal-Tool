@@ -206,6 +206,7 @@ function dragComposite(){
   App.frames = [{ canvas: origC }];
   App.normalFrames = [normalImageData];
   updateDisplay();
+  drawLayerGizmo();
 }
 
 // ── drag-to-move on the preview canvases (mouse + touch) ──
@@ -229,6 +230,32 @@ function layersEditableNow(){
 function updateLayerCanvasEditable(){
   const on = layersEditableNow();
   const cw = $('cw'); if (cw) cw.classList.toggle('layers-editable', on);
+  drawLayerGizmo();
+}
+// Godot-style selection box drawn over the currently active Sprite2D node
+// (whichever layer is being dragged, or the solo'd one) on every visible
+// preview canvas, so it tracks regardless of which view tab is open.
+function drawLayerGizmo(){
+  const activeId = _layerDrag ? _layerDrag.id : App.soloLayerId;
+  const l = activeId != null ? App.layers.find(x => x.id === activeId) : null;
+  const show = App.mode === 'layers' && l && App.layerW;
+  ['boxOrig','boxNorm','boxLit'].forEach(boxId => {
+    const box = $(boxId); if (!box) return;
+    const frame = box.querySelector('.cv-frame'); if (!frame) return;
+    let giz = frame.querySelector('.layer-gizmo');
+    if (!show){ if (giz) giz.style.display = 'none'; return; }
+    if (!giz){
+      giz = document.createElement('div'); giz.className = 'layer-gizmo';
+      giz.innerHTML = '<i class="gz-h gz-tl"></i><i class="gz-h gz-tr"></i><i class="gz-h gz-bl"></i><i class="gz-h gz-br"></i>';
+      frame.appendChild(giz);
+    }
+    giz.style.display = 'block';
+    const dx = l.x - App.layerOriginX, dy = l.y - App.layerOriginY;
+    giz.style.left = (dx / App.layerW * 100) + '%';
+    giz.style.top = (dy / App.layerH * 100) + '%';
+    giz.style.width = (l.canvas.width / App.layerW * 100) + '%';
+    giz.style.height = (l.canvas.height / App.layerH * 100) + '%';
+  });
 }
 let _layerDrag = null;
 function wireLayerDragCanvas(cv){
@@ -241,6 +268,7 @@ function wireLayerDragCanvas(cv){
     cv.style.cursor = 'grabbing';
     _layerDrag = { id: hit.id, startPX: p.x, startPY: p.y, startX: hit.x, startY: hit.y, cv };
     try { cv.setPointerCapture(e.pointerId); } catch(_){}
+    drawLayerGizmo();
   });
   cv.addEventListener('pointermove', e => {
     if (!_layerDrag || _layerDrag.cv !== cv) return;
