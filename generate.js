@@ -38,9 +38,10 @@ function loadMulti(files){
 }
 function parseSheet(){
   if (!App.sheetSrc) return;
-  const cols = +$('cols').value || 4, rows = +$('rows').value || 4;
-  const fc = +$('frameCount').value || cols*rows, sf = +$('startFrame').value || 0;
+  const cols = Math.max(1, Math.floor(+$('cols').value || 4)), rows = Math.max(1, Math.floor(+$('rows').value || 4));
+  const fc = Math.max(1, Math.floor(+$('frameCount').value || cols*rows)), sf = Math.max(0, Math.floor(+$('startFrame').value || 0));
   const fw = Math.floor(App.sheetSrc.width/cols), fh = Math.floor(App.sheetSrc.height/rows);
+  if (!fw || !fh || sf >= cols*rows){ toast(t('surface_grid')); return; }
   App.frames = [];
   for (let i = sf; i < Math.min(sf+fc, cols*rows); i++){
     const col = i%cols, row = Math.floor(i/cols);
@@ -69,26 +70,31 @@ function loadCustomNormal(list){
     App.customNormal = cx.getImageData(0, 0, fc.width, fc.height);
     $('clearNormalBtn').style.display = 'flex';
     setView('lit', document.querySelector('.vtab:nth-child(4)'));
-    renderLit(); applyView();
+    updateDisplay(); applyView();
     toast(t('custom_loaded'));
   }; img.src = e.target.result; };
   r.readAsDataURL(files[0]);
 }
 function clearCustomNormal(){
   App.customNormal = null; $('clearNormalBtn').style.display = 'none';
-  renderLit(); toast(t('back_generated'));
+  updateDisplay(); toast(t('back_generated'));
 }
 
 // ── generation pipeline ──
 async function processAll(){
   if (!App.frames.length) return;
-  setStatus('proc', t('status_processing')); showProg(true); App.normalFrames = [];
-  for (let i = 0; i < App.frames.length; i++){
-    setProg((i / App.frames.length) * 100);
+  const run = ++App.generationId, frames = App.frames, result = [];
+  setStatus('proc', t('status_processing')); showProg(true);
+  for (let i = 0; i < frames.length; i++){
+    setProg((i / frames.length) * 100);
     await new Promise(r => setTimeout(r, 0));
-    App.normalFrames.push(genNormal(App.frames[i].canvas));
+    if (run !== App.generationId || frames !== App.frames) return;
+    result.push(genNormal(frames[i].canvas));
   }
-  setProg(100); App.curFrame = 0; updateDisplay(); buildStrip(); showProg(false);
+  if (run !== App.generationId || frames !== App.frames) return;
+  App.normalFrames = result;
+  App.curFrame = Math.min(App.curFrame, frames.length-1);
+  setProg(100); updateDisplay(); buildStrip(); showProg(false);
   const f = App.frames[0].canvas;
   $('infoBox').innerHTML =
     `<b>Frames:</b> ${App.frames.length}<br><b>Size:</b> ${f.width}×${f.height}px<br><b>Mode:</b> ${App.mode}<br><b>Filter:</b> ${App.filterType}`;
@@ -100,6 +106,7 @@ async function processAll(){
 }
 
 function genNormal(src){
+  if (App.engine === 'surface') return genNormalSurface(src);
   if (App.engine === 'x') return genNormalX(src);
   return genNormalClassic(src);
 }
@@ -310,7 +317,7 @@ function buildStrip(){
   if (App.frames.length <= 1){ strip.classList.remove('on'); return; }
   strip.classList.add('on');
   App.frames.forEach((f, i) => {
-    const th = document.createElement('div'); th.className = 'fthumb' + (i===0?' on':'');
+    const th = document.createElement('div'); th.className = 'fthumb' + (i===App.curFrame?' on':'');
     const tc = document.createElement('canvas'); tc.width = f.canvas.width; tc.height = f.canvas.height;
     tc.getContext('2d').drawImage(f.canvas, 0, 0); th.appendChild(tc);
     const n = document.createElement('span'); n.className = 'fnum'; n.textContent = i; th.appendChild(n);
@@ -381,14 +388,19 @@ function resetGen(){
     sv('v'+id.slice(1), {value:v}, 2);
     const mv = $('mv'+id.slice(1)); if (mv) sv('mv'+id.slice(1), {value:v}, 2);
   });
+  App.surface = surfaceDefaults(); refreshSurfaceUI();
   setXMode('sprite');
   setFilter('sobel'); LP(); toast(t('reset_done'));
 }
 
 // ── export ──
+function activeNormal(index){
+  const src = App.frames[index]?.canvas, custom = index === App.curFrame ? App.customNormal : null;
+  return custom && src && custom.width === src.width && custom.height === src.height ? custom : App.normalFrames[index];
+}
 function exportSingle(){
   if (!App.normalFrames.length){ toast(t('generate_first')); return; }
-  const c = document.createElement('canvas'); const nd = App.normalFrames[App.curFrame];
+  const c = document.createElement('canvas'); const nd = activeNormal(App.curFrame);
   c.width = nd.width; c.height = nd.height; c.getContext('2d').putImageData(nd, 0, 0);
   dl(c, `normal_${String(App.curFrame).padStart(4,'0')}.png`); toast(t('saved'));
 }
@@ -398,7 +410,8 @@ function exportSpritesheet(){
   const cols = +$('cols').value || 4, rows = Math.ceil(App.normalFrames.length/cols);
   const c = document.createElement('canvas'); c.width = fw*cols; c.height = fh*rows;
   const ctx = c.getContext('2d');
-  App.normalFrames.forEach((nd, i) => {
+  App.normalFrames.forEach((generated, i) => {
+    const nd = activeNormal(i);
     const t = document.createElement('canvas'); t.width = fw; t.height = fh;
     t.getContext('2d').putImageData(nd, 0, 0); ctx.drawImage(t, (i%cols)*fw, Math.floor(i/cols)*fh);
   });
@@ -407,7 +420,7 @@ function exportSpritesheet(){
 async function exportAll(){
   if (!App.normalFrames.length) return;
   for (let i = 0; i < App.normalFrames.length; i++){
-    const c = document.createElement('canvas'); const nd = App.normalFrames[i];
+    const c = document.createElement('canvas'); const nd = activeNormal(i);
     c.width = nd.width; c.height = nd.height; c.getContext('2d').putImageData(nd, 0, 0);
     await new Promise(r => setTimeout(r, 60)); dl(c, `normal_${String(i).padStart(4,'0')}.png`);
   }
@@ -420,38 +433,6 @@ function hexToGdColor(hex){
   const b = (parseInt(hex.slice(5,7),16)/255).toFixed(3);
   return `Color(${r}, ${g}, ${b})`;
 }
-function genUid(){
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let s = 'uid://';
-  for (let i = 0; i < 13; i++) s += chars[Math.floor(Math.random()*chars.length)];
-  return s;
-}
-function godotBaseName(){
-  if (App.mode === 'layers') return 'normal_layers_combined';
-  if (App.frames.length > 1) return `normal_frame_${String(App.curFrame).padStart(4,'0')}`;
-  return 'normal_map';
-}
-// Builds a GDScript body (tab-indented) recreating the lights configured
-// in the app's own Lights panel — this is real app state, not a placeholder.
-function godotLightsBody(){
-  const lights = App.lights.filter(l => l.enabled);
-  if (!lights.length){
-    return `\tvar light := PointLight2D.new()\n\tlight.color = Color(1, 1, 1)\n\tlight.energy = 1.0\n\tadd_child(light)`;
-  }
-  return lights.map((l, i) => {
-    const v = lights.length > 1 ? `light${i+1}` : 'light';
-    return `\tvar ${v} := PointLight2D.new()\n\t${v}.color = ${hexToGdColor(l.color)}\n\t${v}.energy = ${l.intensity.toFixed(2)}\n\t${v}.position = Vector2(${Math.round(l.x*80)}, ${Math.round(-l.y*80)})\n\t${v}.shadow_enabled = true\n\tadd_child(${v})`;
-  }).join('\n');
-}
-function copyGodot(){
-  const s = `# NormEngine — Godot 4
-# 1. Import the normal map PNG as a Texture2D
-# 2. Sprite2D -> CanvasItemMaterial -> Normal Map -> assign the texture
-# 3. Lights matching your current preview:
-${godotLightsBody().replace(/\t/g, '')}`;
-  copyToClipboard(s).then(() => toast(t('copied_snippet')), () => toast(t('copy_failed')));
-}
-
 // ════════════ FILL NORMALS TOOL ════════════
 function openFill(){
   if (!App.frames.length){ toast(t('load_sprite_first'));
@@ -499,124 +480,12 @@ function applyFill(){
   if (!App.frames.length) return; App.customNormal = genFill();
   $('clearNormalBtn').style.display = 'flex'; closeFill();
   setActiveTab('htabGen');
-  setView('lit', document.querySelector('.vtab:nth-child(4)')); renderLit(); applyView(); toast(t('fill_applied'));
+  setView('lit', document.querySelector('.vtab:nth-child(4)')); updateDisplay(); applyView(); toast(t('fill_applied'));
 }
 function downloadFill(){
   if (!App.frames.length) return; const fill = genFill();
   const c = document.createElement('canvas'); c.width = fill.width; c.height = fill.height;
   c.getContext('2d').putImageData(fill, 0, 0); dl(c, 'normal_fill.png'); toast(t('fill_saved'));
-}
-
-// ════════════ GODOT .import EXPORT ════════════
-function godotImportConfig(base, isNormal){
-  return `[remap]
-
-importer="texture"
-type="CompressedTexture2D"
-uid="${genUid()}"
-path="res://.godot/imported/${base}.png-generated.ctex"
-
-[deps]
-
-source_file="res://${base}.png"
-dest_files=["res://.godot/imported/${base}.png-generated.ctex"]
-
-[params]
-
-compress/mode=0
-compress/high_quality=false
-compress/lossy_quality=0.7
-compress/hdr_compression=1
-compress/normal_map=${isNormal ? 1 : 0}
-compress/channel_pack=0
-mipmaps/generate=false
-roughness/mode=0
-process/fix_alpha_border=true
-process/premult_alpha=false
-process/normal_map_invert_y=false
-detect_3d/compress_to=0
-`;
-}
-function copyGodotImport(){
-  if (!App.normalFrames.length){ toast(t('generate_first')); return; }
-  const name = godotBaseName();
-  copyToClipboard(godotImportConfig(name, true)).then(
-    () => toast(`${t('copied_import')} — ${name}.png.import`),
-    () => toast(t('copy_failed'))
-  );
-}
-
-// ════════════ GODOT PACKAGE EXPORT (drop-in ready) ════════════
-// Downloads a matched set of files that can be copied straight into a Godot
-// 4 project: the original sprite, the generated normal map, correct .import
-// configs for both (filenames match exactly, so Godot recognizes them),
-// a CanvasTexture .tres wiring diffuse+normal together, a GDScript that
-// recreates the exact lights configured in the app, and a short README.
-function godotTres(name){
-  return `[gd_resource type="CanvasTexture" load_steps=3 format=3]
-
-[ext_resource type="Texture2D" path="res://${name}_diffuse.png" id="1"]
-[ext_resource type="Texture2D" path="res://${name}.png" id="2"]
-
-[resource]
-diffuse_texture = ExtResource("1")
-normal_texture = ExtResource("2")
-`;
-}
-function godotLightsScript(){
-  return `extends Node
-# Generated by NormEngine — recreates the lights from your preview.
-# Attach this to the Sprite2D (or a parent Node2D) and call setup_lights()
-# from _ready(), or copy the body into your own script.
-
-func setup_lights() -> void:
-${godotLightsBody()}
-`;
-}
-function godotReadme(name){
-  return `NormEngine export package
-============================
-
-Files in this package:
-  ${name}_diffuse.png        - your original sprite
-  ${name}.png                - generated normal map
-  ${name}_diffuse.png.import - import settings for the sprite
-  ${name}.png.import         - import settings for the normal map (flagged as a normal map)
-  ${name}_material.tres      - CanvasTexture combining both, ready to assign
-  ${name}_lights.gd          - script recreating your current light setup
-
-Setup in Godot 4:
-  1. Copy ALL of these files into your project folder (e.g. res://sprites/).
-  2. Focus the Godot editor - it re-imports the new files automatically.
-     If you see a uid mismatch warning, ignore it: Godot regenerates uids
-     on first import, this file just needs to exist.
-  3. On your Sprite2D, set Texture = ${name}_material.tres
-  4. Attach ${name}_lights.gd to the Sprite2D (or a parent Node2D), then
-     call setup_lights() from _ready() - or copy its body into your own script.
-
-Generated by NormEngine beta.
-`;
-}
-async function exportGodotPackage(){
-  if (!App.normalFrames.length){ toast(t('generate_first')); return; }
-  const name = godotBaseName();
-  const nd = App.normalFrames[App.curFrame];
-  const srcCanvas = App.frames[App.curFrame].canvas;
-  const normalC = document.createElement('canvas'); normalC.width = nd.width; normalC.height = nd.height;
-  normalC.getContext('2d').putImageData(nd, 0, 0);
-
-  toast(t('godot_pkg_building'));
-  const wait = ms => new Promise(r => setTimeout(r, ms));
-
-  dl(srcCanvas, `${name}_diffuse.png`); await wait(180);
-  dl(normalC, `${name}.png`); await wait(180);
-  downloadText(`${name}_diffuse.png.import`, godotImportConfig(name + '_diffuse', false)); await wait(180);
-  downloadText(`${name}.png.import`, godotImportConfig(name, true)); await wait(180);
-  downloadText(`${name}_material.tres`, godotTres(name)); await wait(180);
-  downloadText(`${name}_lights.gd`, godotLightsScript()); await wait(180);
-  downloadText(`README_Godot.txt`, godotReadme(name));
-
-  toast(t('godot_pkg_done'));
 }
 
 // ════════════ TILESHEET EXPORT (custom grid) ════════════
@@ -634,7 +503,8 @@ function confirmTilesheet(){
   const rows = Math.ceil(App.normalFrames.length / cols);
   const c = document.createElement('canvas'); c.width = fw*cols; c.height = fh*rows;
   const ctx = c.getContext('2d');
-  App.normalFrames.forEach((nd, i) => {
+  App.normalFrames.forEach((generated, i) => {
+    const nd = activeNormal(i);
     const t2 = document.createElement('canvas'); t2.width = fw; t2.height = fh;
     t2.getContext('2d').putImageData(nd, 0, 0);
     ctx.drawImage(t2, (i%cols)*fw, Math.floor(i/cols)*fh);
@@ -883,7 +753,8 @@ function toggleSeamless(el){
   LP();
 }
 function setEngine(e, btn){
-  App.engine = e;
+  App.engine = ['classic','x','surface'].includes(e) ? e : 'surface';
+  refreshSurfaceUI();
   $('engClassic').classList.toggle('on', e==='classic');
   $('engX').classList.toggle('on', e==='x');
   const me1=$('mEngClassic'), me2=$('mEngX');
@@ -891,7 +762,8 @@ function setEngine(e, btn){
   if (me2) me2.classList.toggle('on', e==='x');
   $('xPanel').style.display = e==='x' ? 'block' : 'none';
   const mx=$('mXPanel'); if (mx) mx.style.display = e==='x' ? 'block' : 'none';
-  $('classicPanel').style.display = e==='x' ? 'none' : 'block';
-  const mc=$('mClassicPanel'); if (mc) mc.style.display = e==='x' ? 'none' : 'block';
+  $('classicPanel').style.display = e!=='classic' ? 'none' : 'block';
+  const mc=$('mClassicPanel'); if (mc) mc.style.display = e!=='classic' ? 'none' : 'block';
   LP();
 }
+
