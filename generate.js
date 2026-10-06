@@ -70,14 +70,14 @@ function loadCustomNormal(list){
     App.customNormal = cx.getImageData(0, 0, fc.width, fc.height);
     $('clearNormalBtn').style.display = 'flex';
     setView('lit', document.querySelector('.vtab:nth-child(4)'));
-    renderLit(); applyView();
+    updateDisplay(); applyView();
     toast(t('custom_loaded'));
   }; img.src = e.target.result; };
   r.readAsDataURL(files[0]);
 }
 function clearCustomNormal(){
   App.customNormal = null; $('clearNormalBtn').style.display = 'none';
-  renderLit(); toast(t('back_generated'));
+  updateDisplay(); toast(t('back_generated'));
 }
 
 // ── generation pipeline ──
@@ -512,7 +512,7 @@ function applyFill(){
   if (!App.frames.length) return; App.customNormal = genFill();
   $('clearNormalBtn').style.display = 'flex'; closeFill();
   setActiveTab('htabGen');
-  setView('lit', document.querySelector('.vtab:nth-child(4)')); renderLit(); applyView(); toast(t('fill_applied'));
+  setView('lit', document.querySelector('.vtab:nth-child(4)')); updateDisplay(); applyView(); toast(t('fill_applied'));
 }
 function downloadFill(){
   if (!App.frames.length) return; const fill = genFill();
