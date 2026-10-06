@@ -28,10 +28,10 @@ for(const [theme,variant] of [['godot','dark'],['modern','light'],['modern','dar
  assert.equal(styles.modalBackground,styles.referenceModalBackground,`${theme}/${variant}: modal background`);
  assert.equal(styles.modalBorder,styles.referenceModalBorder,`${theme}/${variant}: modal chrome`);
  assert.equal(styles.overflow,false,`${theme}/${variant}: no horizontal page overflow`);
- await page.screenshot({path:`.test-output/ui-${mobile?'mobile':'desktop'}-${theme}-${variant}-editor.png`});
+ await page.screenshot({animations:'disabled',path:`.test-output/ui-${mobile?'mobile':'desktop'}-${theme}-${variant}-editor.png`});
  await page.evaluate(()=>closeSurfaceEditor());
  if(mobile)await page.evaluate(()=>openSheet('shGen')); 
- await page.screenshot({path:`.test-output/ui-${mobile?'mobile':'desktop'}-${theme}-${variant}-panel.png`});
+ await page.screenshot({animations:'disabled',path:`.test-output/ui-${mobile?'mobile':'desktop'}-${theme}-${variant}-panel.png`});
  if(mobile)await page.evaluate(()=>closeSheet());
 }
 await page.evaluate(()=>applyTheme('godot'));

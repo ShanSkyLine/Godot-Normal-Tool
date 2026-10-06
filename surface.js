@@ -179,7 +179,7 @@ function initSurface(){
   }
   const editor=document.createElement('div');editor.id='surfaceEditor';editor.hidden=true;editor.className='modal-bg surface-editor';editor.setAttribute('role','dialog');editor.setAttribute('aria-modal','true');editor.setAttribute('aria-label','Surface editor');
   editor.innerHTML=`<div class="modal surface-dialog">
-    <div class="modal-hdr"><h3 data-i18n="surface_edit">Edit current frame / layer</h3><button class="btn btn-ghost surface-close" id="surfaceClose" onclick="closeSurfaceEditor()" data-i18n="close">Close</button></div>
+    <div class="modal-hdr"><h3 data-i18n="surface_edit">Edit current frame / layer</h3><button class="btn btn-ghost surface-close" id="surfaceClose" onclick="closeSurfaceEditor()" data-i18n="retro_close">Close</button></div>
     <div class="modal-body"><p class="surface-hint" data-i18n="surface_editor_hint"></p>
     <div class="surface-toolbar">
       <div class="field"><label for="surfaceBrush" data-i18n="surface_brush">Brush</label><select id="surfaceBrush">${['raise','dent','flat','left','right','up','down'].map(k=>`<option value="${k}" data-i18n="surface_${k}">${k}</option>`).join('')}</select></div>
