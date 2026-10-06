@@ -12,6 +12,9 @@ function png(normal=false){
 const lights=[{enabled:true,color:'#ff8844',intensity:1.25,x:0.5,y:-0.4,z:0.7},{enabled:false,color:'#ffffff',intensity:1,x:0,y:0,z:1}];
 function smoke(animated){return `extends SceneTree
 func _initialize() -> void:
+\tcall_deferred("_test")
+
+func _test() -> void:
 \tvar scene := load("res://asset/demo.tscn") as PackedScene
 \tassert(scene != null)
 \tvar instance := scene.instantiate()
