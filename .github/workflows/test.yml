@@ -23,3 +23,10 @@ jobs:
           chmod +x /tmp/godot/Godot_v4.5.1-stable_linux.x86_64
       - name: Validate real Godot import, scene, animation and relocation
         run: python3 tests/godot-runtime.test.py /tmp/godot/Godot_v4.5.1-stable_linux.x86_64
+      - name: Upload theme screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surface-ui
+          path: .test-output/ui-*.png
+          if-no-files-found: ignore

@@ -100,16 +100,6 @@ function restoreProjectState(s){
 // a fresh generation pass — used right after switching tabs
 function refreshUIFromState(){
   refreshSurfaceUI();
-  $('engClassic').classList.toggle('on', App.engine==='classic');
-  $('engX').classList.toggle('on', App.engine==='x');
-  const me1 = $('mEngClassic'), me2 = $('mEngX');
-  if (me1) me1.classList.toggle('on', App.engine==='classic');
-  if (me2) me2.classList.toggle('on', App.engine==='x');
-  $('xPanel').style.display = App.engine==='x' ? 'block' : 'none';
-  const mx = $('mXPanel'); if (mx) mx.style.display = App.engine==='x' ? 'block' : 'none';
-  // classic panel was previously left visible alongside the X panel (bug fix)
-  $('classicPanel').style.display = App.engine!=='classic' ? 'none' : 'block';
-  const mcp = $('mClassicPanel'); if (mcp) mcp.style.display = App.engine!=='classic' ? 'none' : 'block';
   setXMode(App.xMode || 'sprite');
   const sm = $('togSeamless'); if (sm) sm.classList.toggle('on', !!App.xSeamless);
 
@@ -248,6 +238,7 @@ function initProjects(){
   if (App.projects.length) return; // already initialized
   App.projects = [{ id: 1, name: t('project') + ' 1', state: captureProjectState() }];
   App.activeProjectId = 1; App.nextProjectId = 2;
+  refreshEngineUI();
   rebuildProjectTabs();
 }
 

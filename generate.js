@@ -755,15 +755,6 @@ function toggleSeamless(el){
 function setEngine(e, btn){
   App.engine = ['classic','x','surface'].includes(e) ? e : 'surface';
   refreshSurfaceUI();
-  $('engClassic').classList.toggle('on', e==='classic');
-  $('engX').classList.toggle('on', e==='x');
-  const me1=$('mEngClassic'), me2=$('mEngX');
-  if (me1) me1.classList.toggle('on', e==='classic');
-  if (me2) me2.classList.toggle('on', e==='x');
-  $('xPanel').style.display = e==='x' ? 'block' : 'none';
-  const mx=$('mXPanel'); if (mx) mx.style.display = e==='x' ? 'block' : 'none';
-  $('classicPanel').style.display = e!=='classic' ? 'none' : 'block';
-  const mc=$('mClassicPanel'); if (mc) mc.style.display = e!=='classic' ? 'none' : 'block';
   LP();
 }
 

@@ -83,32 +83,45 @@ function surfaceSetting(key,value){
   if(key==='mode' && value==='texture' && App.surface.detail===0)App.surface.detail=0.5;
   refreshSurfaceUI();LP();
 }
+// The engine state is the only source of truth on startup and both UI surfaces.
+function refreshEngineUI(){
+  for(const prefix of ['', 'm']){
+    for(const [engine,suffix] of [['classic','Classic'],['x','X'],['surface','Surface']]){
+      const button=$(prefix+'Eng'+suffix) || (!prefix ? $('eng'+suffix) : null);
+      if(button){const active=App.engine===engine;button.classList.toggle('on',active);button.setAttribute('aria-pressed',String(active));}
+    }
+    for(const [engine,id] of [['classic','ClassicPanel'],['x','XPanel'],['surface','surfacePanel']]){
+      const panel=$(prefix+id) || (!prefix ? $(id[0].toLowerCase()+id.slice(1)) : null);
+      if(panel)panel.style.display=App.engine===engine?'block':'none';
+    }
+  }
+}
 function refreshSurfaceUI(){
   if(!App.surface)App.surface=surfaceDefaults();
+  refreshEngineUI();
   for(const prefix of ['', 'm']){
-    const panel=$(prefix+'surfacePanel');if(!panel)continue;
-    panel.style.display=App.engine==='surface'?'block':'none';
     for(const key of ['mode','volume','detail','smooth','darkRaised']){
       const el=$(prefix+'surface_'+key);if(!el)continue;
-      if(key==='darkRaised')el.checked=App.surface[key];else el.value=App.surface[key];
+      if(key==='darkRaised'){el.checked=App.surface[key];el.closest('.chk').classList.toggle('on',el.checked);}
+      else el.value=App.surface[key];
+      const value=$(prefix+'surfaceValue_'+key);if(value)value.textContent=Number(App.surface[key]).toFixed(key==='smooth'?0:2);
     }
-    const btn=$(prefix?'mEngSurface':'engSurface');if(btn)btn.classList.toggle('on',App.engine==='surface');
     const hint=$(prefix+'surfaceHint');if(hint)hint.textContent=t(App.surface.mode==='height'?'surface_height_hint':'surface_hint');
   }
 }
 function surfacePanelHTML(prefix){
+  const slider=(key,label,max,step)=>`<div class="sl-row"><span data-i18n="${label}"></span><span class="sl-val" id="${prefix}surfaceValue_${key}"></span></div><input aria-label="${key}" id="${prefix}surface_${key}" type="range" min="0" max="${max}" step="${step}" oninput="surfaceSetting('${key}',+this.value)">`;
   return `<div id="${prefix}surfacePanel" class="surface-panel">
-    <label data-i18n="surface_category">Category</label>
+    <div class="field"><label for="${prefix}surface_mode" data-i18n="surface_category">Category</label>
     <select id="${prefix}surface_mode" onchange="surfaceSetting('mode',this.value)">
       <option value="silhouette" data-i18n="surface_silhouette">Silhouette volume</option><option value="texture" data-i18n="surface_texture">Texture relief</option><option value="sculpt" data-i18n="surface_sculpt">Authored form</option><option value="height" data-i18n="surface_height">Height map</option>
-    </select>
+    </select></div>
     <p id="${prefix}surfaceHint" class="surface-hint"></p>
-    <label data-i18n="surface_volume">Body volume</label><input aria-label="Body volume" id="${prefix}surface_volume" type="range" min="0" max="1" step="0.01" oninput="surfaceSetting('volume',+this.value)">
-    <label data-i18n="surface_detail">Colour detail (0 ignores colour)</label><input aria-label="Colour detail" id="${prefix}surface_detail" type="range" min="0" max="1" step="0.01" oninput="surfaceSetting('detail',+this.value)">
-    <label data-i18n="surface_smooth">Detail smoothing</label><input aria-label="Detail smoothing" id="${prefix}surface_smooth" type="range" min="0" max="8" step="1" oninput="surfaceSetting('smooth',+this.value)">
-    <label><input id="${prefix}surface_darkRaised" type="checkbox" onchange="surfaceSetting('darkRaised',this.checked)"><span data-i18n="surface_dark">Dark = raised (texture / height)</span></label>
-    <button class="btn" onclick="openSurfaceEditor()" data-i18n="surface_edit">Edit current frame / layer</button>
-    <label class="btn"><span data-i18n="surface_load">Load height map for current frame / layer</span><input type="file" accept="image/*" onchange="loadSurfaceHeight(this.files);this.value=''" style="max-width:100%"></label>
+    ${slider('volume','surface_volume',1,0.01)}${slider('detail','surface_detail',1,0.01)}${slider('smooth','surface_smooth',8,1)}
+    <label class="chk surface-check"><input class="surface-check-input" id="${prefix}surface_darkRaised" type="checkbox" onchange="surfaceSetting('darkRaised',this.checked)"><span data-i18n="surface_dark">Dark = raised</span></label>
+    <button class="btn btn-act" onclick="openSurfaceEditor()" data-i18n="surface_edit">Edit current frame / layer</button>
+    <button class="btn btn-ghost" onclick="$('${prefix}surfaceHeightInput').click()" data-i18n="surface_load">Load height map</button>
+    <input id="${prefix}surfaceHeightInput" type="file" accept="image/*" hidden onchange="loadSurfaceHeight(this.files);this.value=''">
   </div>`;
 }
 function surfaceSource(){
@@ -164,13 +177,18 @@ function initSurface(){
     const b=document.createElement('button');b.id=prefix?'mEngSurface':'engSurface';b.textContent='Surface';b.onclick=()=>setEngine('surface');anchor.parentElement.appendChild(b);
     const panel=document.createElement('div');panel.innerHTML=surfacePanelHTML(prefix);anchor.parentElement.parentElement.after(panel);
   }
-  const editor=document.createElement('div');editor.id='surfaceEditor';editor.hidden=true;editor.className='surface-editor';editor.setAttribute('role','dialog');editor.setAttribute('aria-modal','true');editor.setAttribute('aria-label','Surface editor');
-  editor.innerHTML=`<div class="surface-dialog"><div class="surface-toolbar"><b data-i18n="surface_edit">Edit current frame / layer</b><button id="surfaceClose" onclick="closeSurfaceEditor()" data-i18n="close">Close</button></div>
-    <p data-i18n="surface_editor_hint">Paint on the artwork. Edits affect only this frame/layer and stay with this project tab.</p>
-    <div class="surface-toolbar"><select id="surfaceBrush">${['raise','dent','flat','left','right','up','down'].map(k=>`<option value="${k}" data-i18n="surface_${k}">${k}</option>`).join('')}</select>
-    <label><span data-i18n="surface_radius">Radius (px)</span><input id="surfaceRadius" type="number" min="1" max="256" value="12"></label><label><span data-i18n="strength">Strength</span><input id="surfacePower" type="range" min="0.05" max="1" step="0.05" value="0.6"></label>
-    <button onclick="undoSurface()" data-i18n="surface_undo">Undo stroke</button><button onclick="clearSurface()" data-i18n="surface_clear">Clear edits</button><label><input type="checkbox" id="surfacePreview" onchange="drawSurfaceEditor()"><span data-i18n="surface_preview">Normal preview</span></label></div>
-    <div class="surface-canvas-wrap"><canvas id="surfaceCanvas"></canvas></div></div>`;
+  const editor=document.createElement('div');editor.id='surfaceEditor';editor.hidden=true;editor.className='modal-bg surface-editor';editor.setAttribute('role','dialog');editor.setAttribute('aria-modal','true');editor.setAttribute('aria-label','Surface editor');
+  editor.innerHTML=`<div class="modal surface-dialog">
+    <div class="modal-hdr"><h3 data-i18n="surface_edit">Edit current frame / layer</h3><button class="btn btn-ghost surface-close" id="surfaceClose" onclick="closeSurfaceEditor()" data-i18n="close">Close</button></div>
+    <div class="modal-body"><p class="surface-hint" data-i18n="surface_editor_hint"></p>
+    <div class="surface-toolbar">
+      <div class="field"><label for="surfaceBrush" data-i18n="surface_brush">Brush</label><select id="surfaceBrush">${['raise','dent','flat','left','right','up','down'].map(k=>`<option value="${k}" data-i18n="surface_${k}">${k}</option>`).join('')}</select></div>
+      <div class="field"><label for="surfaceRadius" data-i18n="surface_radius">Radius (px)</label><input id="surfaceRadius" type="number" min="1" max="256" value="12"></div>
+      <div class="surface-power"><div class="sl-row"><label for="surfacePower" data-i18n="strength">Strength</label><span class="sl-val" id="surfacePowerValue">0.60</span></div><input id="surfacePower" type="range" min="0.05" max="1" step="0.05" value="0.6" oninput="sv('surfacePowerValue',this,2)"></div>
+    </div><div class="surface-actions">
+      <button class="btn btn-ghost" onclick="undoSurface()" data-i18n="surface_undo">Undo stroke</button><button class="btn btn-ghost" onclick="clearSurface()" data-i18n="surface_clear">Clear edits</button>
+      <label class="chk surface-check"><input class="surface-check-input" type="checkbox" id="surfacePreview" onchange="this.closest('.chk').classList.toggle('on',this.checked);drawSurfaceEditor()"><span data-i18n="surface_preview">Normal preview</span></label>
+    </div><div class="cv-frame surface-canvas-wrap"><canvas id="surfaceCanvas"></canvas></div></div></div>`;
   document.body.appendChild(editor);const c=$('surfaceCanvas');
   c.addEventListener('pointerdown',e=>{if(e.button!==0)return;c.setPointerCapture(e.pointerId);surfaceStroke=[];surfaceStroke.id=Date.now()+Math.random();surfaceStamp(e);});
   c.addEventListener('pointermove',e=>{if(surfaceStroke)surfaceStamp(e);});
