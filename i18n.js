@@ -401,3 +401,6 @@ Object.assign(I18N.ru, {
 
 I18N.en.godot_pkg_failed='Godot ZIP export failed. Check image sizes and try again.';
 I18N.ru.godot_pkg_failed='Не удалось собрать Godot ZIP. Проверьте размеры изображений и повторите.';
+
+I18N.en.surface_brush='Brush';
+I18N.ru.surface_brush='Кисть';

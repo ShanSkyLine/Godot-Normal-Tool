@@ -696,18 +696,29 @@ body.compact-mode .left-panel,body.compact-mode .right-panel{display:none}
 }
 
 
-/* Surface engine and touch-safe authoring canvas. */
-.surface-panel { padding:10px 0; display:none; }
-.surface-panel label { display:block; margin:8px 0 4px; }
-.surface-panel select { width:100%; padding:8px; background:var(--bg2,#252a34); color:var(--text,#ddd); }
-.surface-panel .btn { margin-top:8px; width:100%; white-space:normal; }
-.surface-hint { font-size:12px; line-height:1.5; opacity:.8; }
+/* Surface uses the shared field, slider, button, checkbox and modal components
+   so all five appearances inherit their colours, fonts, borders and chrome. */
+.surface-panel { padding:8px 0; display:none; }
+.surface-hint { font-size:11px; line-height:1.5; color:var(--dim); margin:8px 0 12px; }
+.surface-panel .btn { margin-top:8px; white-space:normal; }
+.surface-check { position:relative; white-space:normal; line-height:1.4; }
+.surface-check-input { position:absolute; width:1px; height:1px; opacity:0; }
+.surface-check:focus-within { outline:2px solid var(--accent); outline-offset:2px; }
+.surface-panel .surface-check { margin-bottom:10px; }
 .surface-editor[hidden] { display:none; }
-.surface-editor { position:fixed; inset:0; z-index:10000; background:#000a; display:grid; place-items:center; padding:12px; }
-.surface-dialog { background:var(--bg2,#252a34); color:var(--text,#ddd); padding:16px; border-radius:12px; width:min(900px,100%); max-height:94dvh; overflow:auto; }
-.surface-toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
-.surface-toolbar label { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-.surface-toolbar input[type=number] { width:64px; }
-.surface-toolbar select,.surface-toolbar button { padding:8px; }
-.surface-canvas-wrap { margin-top:14px; overflow:auto; text-align:center; background:repeating-conic-gradient(#303642 0% 25%,#252b35 0% 50%) 0/20px 20px; }
+.surface-editor { display:flex; z-index:10000; padding:12px; }
+.surface-dialog { max-width:900px; max-height:94dvh; }
+.surface-close { width:auto; flex-shrink:0; }
+.surface-toolbar { display:grid; grid-template-columns:minmax(140px,1fr) 110px minmax(140px,1fr); gap:12px; align-items:center; }
+.surface-power .sl-row { font-size:11px; }
+.surface-power input { margin:8px 0 0; }
+.surface-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; align-items:center; }
+.surface-actions .btn { width:auto; flex:1; }
+.surface-canvas-wrap { margin-top:14px; overflow:auto; text-align:center; }
 #surfaceCanvas { display:block; margin:auto; width:auto; height:auto; max-width:100%; max-height:60dvh; touch-action:none; cursor:crosshair; image-rendering:pixelated; }
+@media(max-width:600px){
+  .surface-toolbar { grid-template-columns:minmax(0,1fr) 90px; }
+  .surface-power { grid-column:1/-1; }
+  .surface-actions .surface-check { width:100%; }
+  .surface-dialog .modal-body { padding:12px; }
+}
