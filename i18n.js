@@ -50,9 +50,9 @@ const I18N = {
     export:'Export', normal_png:'Normal map PNG', current_frame:'Current frame',
     normal_sheet:'Normal spritesheet', same_grid:'Same grid', all_frames:'All frames',
     individual_pngs:'Individual PNGs', godot_snippet:'Godot 4 snippet',
-    godot_pkg:'Godot package', godot_pkg_desc:'Sprite + normal map + import + lights script',
+    godot_pkg:'Godot package', godot_pkg_desc:'ZIP: scene + animation + textures + lights',
     godot_pkg_building:'Building Godot package…', godot_pkg_done:'Godot package downloaded — see README',
-    godot_import:'Godot .import file', import_desc:'Ready-to-use import config', copy:'Copy',
+    godot_import:'Godot import settings', import_desc:'Copy import instructions', copy:'Copy',
     tilesheet:'Tilesheet (custom grid)', tilesheet_desc:'Pack frames into tiles',
     info:'Info', no_image:'No image loaded.',
     view_split:'Split', view_orig:'Orig', view_normal:'Normal', view_lit:'Lit',
@@ -185,9 +185,9 @@ const I18N = {
     export:'Экспорт', normal_png:'Карта нормалей PNG', current_frame:'Текущий кадр',
     normal_sheet:'Спрайтшит нормалей', same_grid:'Та же сетка', all_frames:'Все кадры',
     individual_pngs:'Отдельные PNG', godot_snippet:'Сниппет Godot 4',
-    godot_pkg:'Пакет для Godot', godot_pkg_desc:'Спрайт + нормаль + import + скрипт света',
+    godot_pkg:'Пакет для Godot', godot_pkg_desc:'ZIP: сцена + анимация + текстуры + свет',
     godot_pkg_building:'Собираю пакет для Godot…', godot_pkg_done:'Пакет для Godot скачан — см. README',
-    godot_import:'Файл .import для Godot', import_desc:'Готовый конфиг импорта', copy:'Копировать',
+    godot_import:'Настройки импорта Godot', import_desc:'Инструкция по импорту', copy:'Копировать',
     tilesheet:'Тайлшит (своя сетка)', tilesheet_desc:'Упаковать кадры в тайлы',
     info:'Инфо', no_image:'Изображение не загружено.',
     view_split:'Сплит', view_orig:'Ориг.', view_normal:'Нормаль', view_lit:'Свет',
@@ -398,3 +398,6 @@ Object.assign(I18N.ru, {
  surface_editor_hint:'Рисуйте по изображению. Правки работают в режиме «Управляемая форма» только для текущего кадра/слоя. Они остаются во вкладке проекта в течение сессии; шаблоны настроек не содержат изображения и правки.',
  surface_raise:'Выпуклость',surface_dent:'Впадина',surface_flat:'Плоскость / окраска',surface_left:'Наклон влево',surface_right:'Наклон вправо',surface_up:'Наклон вверх',surface_down:'Наклон вниз',surface_radius:'Радиус (px)',surface_undo:'Отменить мазок',surface_clear:'Очистить правки',surface_preview:'Превью нормалей',surface_limit:'Достигнут лимит 4000 отпечатков. Отмените мазок или очистите правки.'
 });
+
+I18N.en.godot_pkg_failed='Godot ZIP export failed. Check image sizes and try again.';
+I18N.ru.godot_pkg_failed='Не удалось собрать Godot ZIP. Проверьте размеры изображений и повторите.';

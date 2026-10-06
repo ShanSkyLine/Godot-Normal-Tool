@@ -20,6 +20,8 @@ assert.equal(await page.evaluate(()=>App.surface.volume),0.65);
 await page.evaluate(()=>switchProject(App.projects[0].id));assert.equal(await page.evaluate(()=>App.surface.volume),0.37);
 await page.evaluate(()=>{App.customNormal=new ImageData(32,32);App.customNormal.data[0]=234;});
 assert.equal(await page.evaluate(()=>activeNormal(0).data[0]),234);
+const [download]=await Promise.all([page.waitForEvent('download'),page.evaluate(()=>exportGodotPackage())]);
+assert.equal(download.suggestedFilename(),'normengine_godot_0.8.0.zip');
 await page.evaluate(()=>{setEngine('classic');setEngine('x');setEngine('surface');});
 assert.equal(await page.locator('#classicPanel').evaluate(e=>e.style.display),'none');
 assert.equal(await page.locator('#xPanel').evaluate(e=>e.style.display),'none');
