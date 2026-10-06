@@ -694,3 +694,20 @@ body.compact-mode .left-panel,body.compact-mode .right-panel{display:none}
   .engine-close{display:flex!important}
   .engine-overlay{top:calc(42px + env(safe-area-inset-top,0px))!important}
 }
+
+
+/* Surface engine and touch-safe authoring canvas. */
+.surface-panel { padding:10px 0; display:none; }
+.surface-panel label { display:block; margin:8px 0 4px; }
+.surface-panel select { width:100%; padding:8px; background:var(--bg2,#252a34); color:var(--text,#ddd); }
+.surface-panel .btn { margin-top:8px; width:100%; white-space:normal; }
+.surface-hint { font-size:12px; line-height:1.5; opacity:.8; }
+.surface-editor[hidden] { display:none; }
+.surface-editor { position:fixed; inset:0; z-index:10000; background:#000a; display:grid; place-items:center; padding:12px; }
+.surface-dialog { background:var(--bg2,#252a34); color:var(--text,#ddd); padding:16px; border-radius:12px; width:min(900px,100%); max-height:94dvh; overflow:auto; }
+.surface-toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
+.surface-toolbar label { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.surface-toolbar input[type=number] { width:64px; }
+.surface-toolbar select,.surface-toolbar button { padding:8px; }
+.surface-canvas-wrap { margin-top:14px; overflow:auto; text-align:center; background:repeating-conic-gradient(#303642 0% 25%,#252b35 0% 50%) 0/20px 20px; }
+#surfaceCanvas { display:block; margin:auto; width:auto; height:auto; max-width:100%; max-height:60dvh; touch-action:none; cursor:crosshair; image-rendering:pixelated; }

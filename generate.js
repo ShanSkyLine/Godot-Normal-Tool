@@ -38,9 +38,10 @@ function loadMulti(files){
 }
 function parseSheet(){
   if (!App.sheetSrc) return;
-  const cols = +$('cols').value || 4, rows = +$('rows').value || 4;
-  const fc = +$('frameCount').value || cols*rows, sf = +$('startFrame').value || 0;
+  const cols = Math.max(1, Math.floor(+$('cols').value || 4)), rows = Math.max(1, Math.floor(+$('rows').value || 4));
+  const fc = Math.max(1, Math.floor(+$('frameCount').value || cols*rows)), sf = Math.max(0, Math.floor(+$('startFrame').value || 0));
   const fw = Math.floor(App.sheetSrc.width/cols), fh = Math.floor(App.sheetSrc.height/rows);
+  if (!fw || !fh || sf >= cols*rows){ toast(t('surface_grid')); return; }
   App.frames = [];
   for (let i = sf; i < Math.min(sf+fc, cols*rows); i++){
     const col = i%cols, row = Math.floor(i/cols);
@@ -82,13 +83,18 @@ function clearCustomNormal(){
 // ── generation pipeline ──
 async function processAll(){
   if (!App.frames.length) return;
-  setStatus('proc', t('status_processing')); showProg(true); App.normalFrames = [];
-  for (let i = 0; i < App.frames.length; i++){
-    setProg((i / App.frames.length) * 100);
+  const run = ++App.generationId, frames = App.frames, result = [];
+  setStatus('proc', t('status_processing')); showProg(true);
+  for (let i = 0; i < frames.length; i++){
+    setProg((i / frames.length) * 100);
     await new Promise(r => setTimeout(r, 0));
-    App.normalFrames.push(genNormal(App.frames[i].canvas));
+    if (run !== App.generationId || frames !== App.frames) return;
+    result.push(genNormal(frames[i].canvas));
   }
-  setProg(100); App.curFrame = 0; updateDisplay(); buildStrip(); showProg(false);
+  if (run !== App.generationId || frames !== App.frames) return;
+  App.normalFrames = result;
+  App.curFrame = Math.min(App.curFrame, frames.length-1);
+  setProg(100); updateDisplay(); buildStrip(); showProg(false);
   const f = App.frames[0].canvas;
   $('infoBox').innerHTML =
     `<b>Frames:</b> ${App.frames.length}<br><b>Size:</b> ${f.width}×${f.height}px<br><b>Mode:</b> ${App.mode}<br><b>Filter:</b> ${App.filterType}`;
@@ -100,6 +106,7 @@ async function processAll(){
 }
 
 function genNormal(src){
+  if (App.engine === 'surface') return genNormalSurface(src);
   if (App.engine === 'x') return genNormalX(src);
   return genNormalClassic(src);
 }
@@ -310,7 +317,7 @@ function buildStrip(){
   if (App.frames.length <= 1){ strip.classList.remove('on'); return; }
   strip.classList.add('on');
   App.frames.forEach((f, i) => {
-    const th = document.createElement('div'); th.className = 'fthumb' + (i===0?' on':'');
+    const th = document.createElement('div'); th.className = 'fthumb' + (i===App.curFrame?' on':'');
     const tc = document.createElement('canvas'); tc.width = f.canvas.width; tc.height = f.canvas.height;
     tc.getContext('2d').drawImage(f.canvas, 0, 0); th.appendChild(tc);
     const n = document.createElement('span'); n.className = 'fnum'; n.textContent = i; th.appendChild(n);
@@ -381,14 +388,19 @@ function resetGen(){
     sv('v'+id.slice(1), {value:v}, 2);
     const mv = $('mv'+id.slice(1)); if (mv) sv('mv'+id.slice(1), {value:v}, 2);
   });
+  App.surface = surfaceDefaults(); refreshSurfaceUI();
   setXMode('sprite');
   setFilter('sobel'); LP(); toast(t('reset_done'));
 }
 
 // ── export ──
+function activeNormal(index){
+  const src = App.frames[index]?.canvas, custom = index === App.curFrame ? App.customNormal : null;
+  return custom && src && custom.width === src.width && custom.height === src.height ? custom : App.normalFrames[index];
+}
 function exportSingle(){
   if (!App.normalFrames.length){ toast(t('generate_first')); return; }
-  const c = document.createElement('canvas'); const nd = App.normalFrames[App.curFrame];
+  const c = document.createElement('canvas'); const nd = activeNormal(App.curFrame);
   c.width = nd.width; c.height = nd.height; c.getContext('2d').putImageData(nd, 0, 0);
   dl(c, `normal_${String(App.curFrame).padStart(4,'0')}.png`); toast(t('saved'));
 }
@@ -398,7 +410,8 @@ function exportSpritesheet(){
   const cols = +$('cols').value || 4, rows = Math.ceil(App.normalFrames.length/cols);
   const c = document.createElement('canvas'); c.width = fw*cols; c.height = fh*rows;
   const ctx = c.getContext('2d');
-  App.normalFrames.forEach((nd, i) => {
+  App.normalFrames.forEach((generated, i) => {
+    const nd = activeNormal(i);
     const t = document.createElement('canvas'); t.width = fw; t.height = fh;
     t.getContext('2d').putImageData(nd, 0, 0); ctx.drawImage(t, (i%cols)*fw, Math.floor(i/cols)*fh);
   });
@@ -407,7 +420,7 @@ function exportSpritesheet(){
 async function exportAll(){
   if (!App.normalFrames.length) return;
   for (let i = 0; i < App.normalFrames.length; i++){
-    const c = document.createElement('canvas'); const nd = App.normalFrames[i];
+    const c = document.createElement('canvas'); const nd = activeNormal(i);
     c.width = nd.width; c.height = nd.height; c.getContext('2d').putImageData(nd, 0, 0);
     await new Promise(r => setTimeout(r, 60)); dl(c, `normal_${String(i).padStart(4,'0')}.png`);
   }
@@ -600,7 +613,7 @@ Generated by NormEngine beta.
 async function exportGodotPackage(){
   if (!App.normalFrames.length){ toast(t('generate_first')); return; }
   const name = godotBaseName();
-  const nd = App.normalFrames[App.curFrame];
+  const nd = activeNormal(App.curFrame);
   const srcCanvas = App.frames[App.curFrame].canvas;
   const normalC = document.createElement('canvas'); normalC.width = nd.width; normalC.height = nd.height;
   normalC.getContext('2d').putImageData(nd, 0, 0);
@@ -634,7 +647,8 @@ function confirmTilesheet(){
   const rows = Math.ceil(App.normalFrames.length / cols);
   const c = document.createElement('canvas'); c.width = fw*cols; c.height = fh*rows;
   const ctx = c.getContext('2d');
-  App.normalFrames.forEach((nd, i) => {
+  App.normalFrames.forEach((generated, i) => {
+    const nd = activeNormal(i);
     const t2 = document.createElement('canvas'); t2.width = fw; t2.height = fh;
     t2.getContext('2d').putImageData(nd, 0, 0);
     ctx.drawImage(t2, (i%cols)*fw, Math.floor(i/cols)*fh);
@@ -883,7 +897,8 @@ function toggleSeamless(el){
   LP();
 }
 function setEngine(e, btn){
-  App.engine = e;
+  App.engine = ['classic','x','surface'].includes(e) ? e : 'surface';
+  refreshSurfaceUI();
   $('engClassic').classList.toggle('on', e==='classic');
   $('engX').classList.toggle('on', e==='x');
   const me1=$('mEngClassic'), me2=$('mEngX');
@@ -891,7 +906,8 @@ function setEngine(e, btn){
   if (me2) me2.classList.toggle('on', e==='x');
   $('xPanel').style.display = e==='x' ? 'block' : 'none';
   const mx=$('mXPanel'); if (mx) mx.style.display = e==='x' ? 'block' : 'none';
-  $('classicPanel').style.display = e==='x' ? 'none' : 'block';
-  const mc=$('mClassicPanel'); if (mc) mc.style.display = e==='x' ? 'none' : 'block';
+  $('classicPanel').style.display = e!=='classic' ? 'none' : 'block';
+  const mc=$('mClassicPanel'); if (mc) mc.style.display = e!=='classic' ? 'none' : 'block';
   LP();
 }
+

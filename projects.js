@@ -56,7 +56,7 @@ function blankProjectState(){
     nextLightId:2,
     viewMode:'split', zoomScale:1, zoomAuto:true,
     combinedViews:['orig','norm'], canvasSize:{ mode:'auto', w:512, h:512 },
-    engine:'classic', xMode:'sprite', xSeamless:true, filterType:'sobel', invert:{ r:false, g:false, h:false }, fillShape:'radial',
+    engine:'surface', surface:surfaceDefaults(), xMode:'sprite', xSeamless:true, filterType:'sobel', invert:{ r:false, g:false, h:false }, fillShape:'radial',
     aoFrame:null, aoEnabled:false,
     settings: defaultSettings(),
   };
@@ -70,6 +70,7 @@ function captureProjectState(){
     lights: App.lights, nextLightId: App.nextLightId,
     viewMode: App.viewMode, zoomScale: App.zoomScale, zoomAuto: App.zoomAuto,
     combinedViews: [...App.combinedViews], canvasSize: { ...App.canvasSize },
+    surface: { ...App.surface },
     engine: App.engine, xMode: App.xMode, xSeamless: App.xSeamless,
     filterType: App.filterType, invert: { ...App.invert }, fillShape: App.fillShape,
     aoFrame: (typeof aoFrame !== 'undefined') ? aoFrame : null,
@@ -78,6 +79,9 @@ function captureProjectState(){
   };
 }
 function restoreProjectState(s){
+  App.generationId++; clearTimeout(App.lpTimer); showProg(false);
+  closeSurfaceEditor();
+  App.surface = cleanSurface(s.surface);
   App.mode = s.mode; App.frames = s.frames; App.normalFrames = s.normalFrames; App.curFrame = s.curFrame;
   App.customNormal = s.customNormal; App.sheetSrc = s.sheetSrc;
   App.layers = s.layers; App.nextLayerId = s.nextLayerId; App.soloLayerId = s.soloLayerId;
@@ -95,6 +99,7 @@ function restoreProjectState(s){
 // repaints every part of the UI from current App state, without triggering
 // a fresh generation pass — used right after switching tabs
 function refreshUIFromState(){
+  refreshSurfaceUI();
   $('engClassic').classList.toggle('on', App.engine==='classic');
   $('engX').classList.toggle('on', App.engine==='x');
   const me1 = $('mEngClassic'), me2 = $('mEngX');
@@ -103,8 +108,8 @@ function refreshUIFromState(){
   $('xPanel').style.display = App.engine==='x' ? 'block' : 'none';
   const mx = $('mXPanel'); if (mx) mx.style.display = App.engine==='x' ? 'block' : 'none';
   // classic panel was previously left visible alongside the X panel (bug fix)
-  $('classicPanel').style.display = App.engine==='x' ? 'none' : 'block';
-  const mcp = $('mClassicPanel'); if (mcp) mcp.style.display = App.engine==='x' ? 'none' : 'block';
+  $('classicPanel').style.display = App.engine!=='classic' ? 'none' : 'block';
+  const mcp = $('mClassicPanel'); if (mcp) mcp.style.display = App.engine!=='classic' ? 'none' : 'block';
   setXMode(App.xMode || 'sprite');
   const sm = $('togSeamless'); if (sm) sm.classList.toggle('on', !!App.xSeamless);
 
@@ -293,6 +298,7 @@ function downloadJSON(filename, obj){
 function downloadTemplate(){
   const tpl = {
     normengineTemplate: 1,
+    surface: { ...App.surface },
     engine: App.engine, xMode: App.xMode, xSeamless: App.xSeamless,
     filterType: App.filterType, invert: { ...App.invert },
     canvasSize: { ...App.canvasSize }, combinedViews: [...App.combinedViews],
@@ -310,7 +316,8 @@ function loadTemplateFile(files){
     try { tpl = JSON.parse(e.target.result); } catch(err){ toast(t('template_invalid')); return; }
     if (!tpl || typeof tpl !== 'object' || !tpl.normengineTemplate){ toast(t('template_invalid')); return; }
     newProject();
-    App.engine = tpl.engine || 'classic';
+    App.engine = ['classic','x','surface'].includes(tpl.engine) ? tpl.engine : 'surface';
+    App.surface = cleanSurface(tpl.surface);
     App.xMode = tpl.xMode || 'sprite';
     App.xSeamless = tpl.xSeamless !== false;
     App.filterType = tpl.filterType || 'sobel';
@@ -329,3 +336,4 @@ function loadTemplateFile(files){
   };
   r.readAsText(f);
 }
+

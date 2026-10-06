@@ -206,6 +206,7 @@ function initUX(){
 
 // ════════════ INIT ════════════
 window.addEventListener('DOMContentLoaded',()=>{
+  initSurface();
   curLang=detectLang();
   applyI18n();
   const lb=$('langBtn');if(lb)lb.textContent=curLang==='en'?'RU':'EN';
@@ -229,3 +230,4 @@ window.addEventListener('DOMContentLoaded',()=>{
     if (onboarded && !localStorage.getItem('ng_tut_done')) openTutorial();
   }catch(e){openTutorial();}
 });
+

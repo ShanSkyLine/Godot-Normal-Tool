@@ -15,7 +15,9 @@ const App = {
   lpTimer: null, sheetSrc: null,
   zoomScale: 1, zoomAuto: true,
   filterType: 'sobel',
-  engine: 'classic',
+  engine: 'surface',
+  surface: surfaceDefaults(),
+  generationId: 0,
   xMode: 'sprite',     // experimental engine target: 'sprite' | 'texture'
   xSeamless: true,     // texture mode: wrap-around convolutions for tileable maps
   invert: { r:false, g:false, h:false },
@@ -110,6 +112,7 @@ function toast(msg){
 // ── live preview debounce ──
 function LP(){
   clearTimeout(App.lpTimer);
+  App.generationId++;
   // A generator control describes a generated map.  Once it is touched,
   // return from a loaded/fill map so the requested change is visible.
   if (App.customNormal){
@@ -161,3 +164,4 @@ function loadRecent(){
   try { const r = localStorage.getItem('ng_recent'); if (r) App.recentPairs = JSON.parse(r); } catch(e){}
 }
 loadRecent();
+

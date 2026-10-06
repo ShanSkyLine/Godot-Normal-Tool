@@ -1,0 +1,21 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const c=vm.createContext({console,ImageData:class {constructor(data,width,height){Object.assign(this,{data,width,height});}},document:{getElementById:id=>({value:id==='sStr'?2.5:0.5})}});
+vm.runInContext(fs.readFileSync('surface.js','utf8')+fs.readFileSync('core.js','utf8'),c);
+const run=code=>vm.runInContext(code,c);
+run(`function fixture(colour=200){const w=17,h=17,data=new Uint8ClampedArray(w*h*4);for(let y=0;y<h;y++)for(let x=0;x<w;x++){let i=(y*w+x)*4;if(Math.hypot(x-8,y-8)<7){data[i]=data[i+1]=data[i+2]=colour;data[i+3]=255;}}return {width:w,height:h,getContext:()=>({getImageData:()=>({data})})};}var src=fixture();var normal=genNormalSurface(src);`);
+assert.deepEqual(Array.from(run('normal.data')),Array.from(run('genNormalSurface(fixture(0)).data')),'silhouette normals must ignore painted colour');
+const p=(x,y)=>Array.from(run(`normal.data.slice((${y}*17+${x})*4,(${y}*17+${x})*4+4)`));
+assert(p(3,8)[0]<128 && p(13,8)[0]>128,'left and right face outward');
+assert(p(8,3)[1]>128 && p(8,13)[1]<128,'Godot Y+ orientation');
+assert.deepEqual(p(0,0),[128,128,255,0],'transparent pixels are neutral');
+for(let i=0;i<17*17;i++){const q=Array.from(run(`normal.data.slice(${i*4},${i*4+4})`));if(q[3])assert(Math.abs(Math.hypot(...q.slice(0,3).map(v=>v/255*2-1))-1)<0.012);}
+run(`App.surface.mode='height';var flat=genNormalSurface(src);`);
+assert.deepEqual(Array.from(run('flat.data.slice((8*17+8)*4,(8*17+8)*4+3)')),[128,128,255]);
+run(`src._surfaceHeight={w:17,h:17,data:Float32Array.from({length:289},(_,i)=>(i%17)/16)};var ramp=genNormalSurface(src);App.surface.darkRaised=true;var inv=genNormalSurface(src);`);
+assert(run('ramp.data[(8*17+8)*4]')<128);assert(run('inv.data[(8*17+8)*4]')>128);
+run(`App.surface=surfaceDefaults();App.surface.mode='sculpt';App.surface.volume=0;src._surfaceEdits=[{x:8,y:8,r:6,power:1,tool:'left'}];var left=genNormalSurface(src);src._surfaceEdits[0].tool='right';var right=genNormalSurface(src);`);
+assert(run('left.data[(8*17+8)*4]')<128);assert(run('right.data[(8*17+8)*4]')>128);
+run(`src._surfaceEdits=[{x:8,y:8,r:6,power:1,tool:'raise'}];var raised=genNormalSurface(src);src._surfaceEdits[0].tool='dent';var dent=genNormalSurface(src);`);
+assert(run('raised.data[(8*17+5)*4]')<128);assert(run('dent.data[(8*17+5)*4]')>128);
+assert.equal(run(`cleanSurface({volume:99,detail:-4,smooth:'bad',mode:'bad'}).volume`),1);
+console.log('Surface: colour independence, alpha, orientation, unit normals, height inversion and authoring passed.');

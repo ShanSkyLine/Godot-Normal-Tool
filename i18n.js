@@ -82,7 +82,7 @@ const I18N = {
     tut_skip:'Skip tutorial', tut_back:'← Back', tut_next:'Next →', tut_start:'Get started',
     tut_getting_started:'Getting started',
 
-    // ── v0.7.0 additions: preset/slider labels, filter names, invert chips ──
+    // ── v0.8.0 additions: preset/slider labels, filter names, invert chips ──
     preset_soft:'Soft', preset_balanced:'Balanced', preset_crisp:'Crisp',
     lbl_detail:'Detail', lbl_volume:'Volume', lbl_shape:'Shape', lbl_smooth:'Smooth', lbl_crisp:'Micro contrast',
     filter_sobel:'Sobel', filter_scharr:'Scharr',
@@ -214,7 +214,7 @@ const I18N = {
     tut_skip:'Пропустить', tut_back:'← Назад', tut_next:'Далее →', tut_start:'Начать',
     tut_getting_started:'С чего начать',
 
-    // ── добавления v0.7.0 ──
+    // ── добавления v0.8.0 ──
     preset_soft:'Мягкий', preset_balanced:'Сбаланс.', preset_crisp:'Резкий',
     lbl_detail:'Детали', lbl_volume:'Объём', lbl_shape:'Форма', lbl_smooth:'Сглаживание', lbl_crisp:'Микро-контраст',
     filter_sobel:'Sobel', filter_scharr:'Scharr',
@@ -270,7 +270,7 @@ const I18N = {
 
 const TUT_STEPS_I18N = {
   en: [
-    {icon:'⬡',title:'Welcome to NormEngine v0.7.0',text:'This tool generates <b>normal maps</b> for 2D sprites — perfect for Godot 4.x dynamic lighting. Takes ~30 seconds to learn.'},
+    {icon:'⬡',title:'Welcome to NormEngine v0.8.0',text:'This tool generates <b>normal maps</b> for 2D sprites — perfect for Godot 4.x dynamic lighting. Takes ~30 seconds to learn.'},
     {icon:'🖼',title:'Load a sprite',text:'Drag & drop a PNG, or tap to browse. Supports single sprites, <b>spritesheets</b> (auto-sliced), or <b>multiple frames</b> at once.'},
     {icon:'⚙️',title:'Adjust settings',text:'<b>Strength</b> = relief amount.<br><b>Level</b> = detail scale.<br><b>Blur</b> = smooth noise.<br><b>Z Range</b> = depth.<br>Hover <b>ⓘ</b> for tips.'},
     {icon:'💡',title:'Multi-light preview',text:'Add coloured lights in the right panel. Drag the <b>light pad</b> to set direction. See it in the <b>Lit</b> view.'},
@@ -278,7 +278,7 @@ const TUT_STEPS_I18N = {
     {icon:'📦',title:'Export for Godot',text:'Use <b>Godot package</b> for a ready-to-drop-in bundle (sprite + normal map + import files + lights script), or copy the <b>.import</b> config / GDScript snippet directly.'},
   ],
   ru: [
-    {icon:'⬡',title:'Добро пожаловать в NormEngine v0.7.0',text:'Этот инструмент создаёт <b>карты нормалей</b> для 2D-спрайтов — идеально для динамического света в Godot 4.x. Освоить можно за ~30 секунд.'},
+    {icon:'⬡',title:'Добро пожаловать в NormEngine v0.8.0',text:'Этот инструмент создаёт <b>карты нормалей</b> для 2D-спрайтов — идеально для динамического света в Godot 4.x. Освоить можно за ~30 секунд.'},
     {icon:'🖼',title:'Загрузи спрайт',text:'Перетащи PNG или нажми для выбора. Поддерживает одиночные спрайты, <b>спрайтшиты</b> (авто-нарезка) или <b>несколько кадров</b> сразу.'},
     {icon:'⚙️',title:'Настрой параметры',text:'<b>Сила</b> = величина рельефа.<br><b>Уровень</b> = масштаб деталей.<br><b>Блюр</b> = сглаживание.<br><b>Z-глубина</b> = глубина.<br>Наведи на <b>ⓘ</b> для подсказок.'},
     {icon:'💡',title:'Превью с освещением',text:'Добавь цветные источники в правой панели. Тяни <b>площадку света</b> для направления. Смотри в режиме <b>Свет</b>.'},
@@ -322,6 +322,7 @@ function applyI18n(){
   if (typeof renderTutStep === 'function' && $('tutModal') && $('tutModal').classList.contains('open')) renderTutStep();
   if (typeof applyI18nTitles === 'function') applyI18nTitles();
   if (typeof renderChangelog === 'function') renderChangelog();
+  if (typeof refreshSurfaceUI === 'function') refreshSurfaceUI();
   if (typeof renderEngineTab === 'function') renderEngineTab();
   // Light controls are built dynamically, so rebuild them after language
   // changes instead of leaving colour/profile labels in the previous language.
@@ -331,59 +332,25 @@ function applyI18n(){
 
 // ── changelog (What's new) ──
 const CHANGELOG_I18N = {
-  version:'v0.7.0',
-  en: [
-    'Redesigned the whole interface in a Godot-editor style — docked panels, category bars, custom icon set.',
-    'Restored the Spin tool (360° preview / turntable export), which existed in code but had no way to open it.',
-    'Experimental engine: added Sprite vs Texture data-type modes; Texture mode generates seamless, tileable normal maps.',
-    'New: Engine tab — keyboard shortcut reference and the appearance switcher.',
-    'New: four visual styles — Godot, Modern (light/dark), Retro, Space — with a first-run picker.',
-    'New: this changelog, opened from the version badge in the header.',
-    'Fixed: the on-canvas "load a sprite" hint could get stuck instead of clearing once an image was loaded.',
-    'Fixed: mobile bottom sheets could freeze at a half-dragged height and stop responding to taps.',
-    'Fixed: the Spin tool could cover the mobile navigation bar with no way back out.',
-    'Fixed: many interface labels were missing from the Russian translation — swept and completed.',
-    'Fixed: the ambient-occlusion map not scaling with viewport zoom.',
-    'Fixed: stale AO maps lingering after switching frames.',
-    'Fixed: both engine option panels showing at once after switching projects.',
-    'Fixed: the frame-rate control not applying while animation playback was running.',
-    'Fixed: the Seamless toggle in Texture mode rendered misaligned; removed the stray lightning emoji from "Experimental".',
-    'Fixed: the version badge kept a light background in every style, including dark ones.',
-    'Fixed: the "style changed" notification could get stuck on screen instead of fading out, and now follows the current style\'s colours.',
-    'Fixed: the active project tab could be scrolled out of view on mobile; the mobile tab bar is now bigger and clearer too.',
-    "Fixed: the bottom mobile toolbar's labels could overlap each other.",
-    'Fixed: non-square sprites could come out squished in the mobile preview.',
-    'Fixed: touch dragging/panning the canvas view was unreliable.',
-    'The GitHub button now links to this project\'s repository.',
-    'New: Project Settings — a fixed or automatic canvas size, a combined-view layout, and a downloadable/loadable settings template.',
-    'New: Retro style\'s window-control buttons are now clickable, with a small easter egg on Close.',
-  ],
-  ru: [
-    'Полностью переработан интерфейс в стиле редактора Godot — панели-доки, заголовки категорий, свой набор иконок.',
-    'Восстановлен инструмент «Вращение» (360°-превью / экспорт видео) — был в коде, но нечем было его открыть.',
-    'Экспериментальный движок: добавлены режимы Спрайт и Текстура; режим Текстура создаёт бесшовные тайловые карты нормалей.',
-    'Новое: вкладка «Движок» — список горячих клавиш и переключатель внешнего вида.',
-    'Новое: четыре визуальных стиля — Godot, Modern (светлая/тёмная), Retro, Space — с выбором при первом запуске.',
-    'Новое: этот список изменений, открывается по клику на номер версии в шапке.',
-    'Исправлено: подсказка «загрузи спрайт» на холсте могла зависать и не пропадать после загрузки изображения.',
-    'Исправлено: мобильные шторки могли застревать на полпути перетаскивания и переставать откликаться на нажатия.',
-    'Исправлено: инструмент «Вращение» мог перекрывать мобильную навигацию без возможности выйти.',
-    'Исправлено: многим подписям интерфейса не хватало русского перевода — пройдено и доделано.',
-    'Исправлено: карта ambient occlusion не масштабировалась вместе с зумом.',
-    'Исправлено: устаревшая AO-карта оставалась видна после смены кадра.',
-    'Исправлено: обе панели настроек движка отображались одновременно после смены проекта.',
-    'Исправлено: смена FPS не применялась во время воспроизведения анимации.',
-    'Исправлено: тумблер «Бесшовно» в режиме Текстура отображался со сдвигом; убрана лишняя эмодзи-молния из «Экспериментальный».',
-    'Исправлено: бейдж версии оставался светлым в любом стиле, включая тёмные.',
-    'Исправлено: уведомление «стиль изменён» могло зависать на экране вместо исчезновения, и теперь следует цветам текущего стиля.',
-    'Исправлено: активную вкладку проекта могло прокрутить за пределы экрана на телефоне; сама панель вкладок стала крупнее и заметнее.',
-    'Исправлено: подписи нижней мобильной панели могли наезжать друг на друга.',
-    'Исправлено: не-квадратные спрайты могли сплющиваться в мобильном превью.',
-    'Исправлено: перетаскивание/панорамирование канваса пальцем работало нестабильно.',
-    'Кнопка GitHub теперь ведёт на репозиторий этого проекта.',
-    'Новое: «Настройки проекта» — фиксированный или автоматический размер канваса, комбинированный вид панелей и шаблон настроек для скачивания/загрузки.',
-    'Новое: кнопки управления окном в стиле Retro теперь кликабельны, с маленькой пасхалкой на «Закрыть».',
-  ],
+ version:'v0.8.0',
+ en:[
+  'Surface engine: four categories — silhouette volume, texture relief, authored form and imported height maps.',
+  'Colour-independent body volume: dark eyes and paint no longer automatically become holes.',
+  'Touch-friendly form editor: raised/recessed areas, flattening, left/right/up/down surface directions and stroke undo.',
+  'Per-frame/per-layer edits and height maps; Surface settings follow project tabs and settings templates.',
+  'Fixed overlapping generation runs mixing animation frames; kept the selected frame during regeneration.',
+  'Fixed PNG and Godot package exports ignoring the active custom / Fill normal map.',
+  'Validated spritesheet grids and height-map dimensions; all generation remains local in the browser.'
+ ],
+ ru:[
+  'Движок Surface: четыре категории — объём по силуэту, рельеф текстуры, управляемая форма и карта высот.',
+  'Объём независимо от цвета: чёрные глаза и окраска больше не становятся впадинами автоматически.',
+  'Редактор формы с поддержкой касаний: выпуклости, впадины, плоскость, наклон влево/вправо/вверх/вниз и отмена мазка.',
+  'Правки и карты высот отдельно для каждого кадра/слоя; настройки Surface сохраняются во вкладках проектов и шаблонах.',
+  'Исправлено смешивание кадров при параллельных запусках генерации; выбранный кадр сохраняется при пересчёте.',
+  'Исправлен экспорт PNG и Godot-пакета: теперь учитывается активная пользовательская / Fill-карта.',
+  'Добавлена проверка сетки спрайтшита и размеров карты высот; обработка остаётся локальной в браузере.'
+ ]
 };
 function renderChangelog(){
   const items = CHANGELOG_I18N[curLang] || CHANGELOG_I18N.en;
@@ -407,7 +374,27 @@ function pluralFrames(n){
 }
 
 // data-i18n-title: localize a `title` tooltip attribute the same way
-// data-i18n localizes text content (added in v0.7.0 alongside the RU sweep).
+// data-i18n localizes text content (added in v0.8.0 alongside the RU sweep).
 function applyI18nTitles(){
   document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
 }
+
+
+Object.assign(I18N.en, {
+ surface_category:'Generation category', surface_silhouette:'Silhouette volume', surface_texture:'Texture relief', surface_sculpt:'Authored form', surface_height:'Height map',
+ surface_hint:'Volume comes from the alpha silhouette. Colour detail is optional: a black eye can remain flat paint. Texture mode uses colour as relief and needs Detail above zero.',
+ surface_height_hint:'Load a grayscale height map matching this frame/layer size. White = raised, black = recessed; invert if needed. Without a map the surface is flat.',
+ surface_volume:'Body volume',surface_detail:'Colour detail (0 ignores colour)',surface_smooth:'Detail smoothing',surface_dark:'Dark = raised (texture / height)',surface_edit:'Edit current frame / layer',surface_load:'Load height map for current frame / layer',
+ surface_select:'Load a sprite, or select a solo layer first.',surface_size:'Height map must exactly match the frame/layer dimensions.',surface_invalid:'Could not decode the height map.',surface_grid:'Invalid grid: cells must have pixels and the start frame must exist.',
+ surface_editor_hint:'Paint on the artwork. Edits apply in Authored form mode, only to this frame/layer. They stay in this project tab during the session; settings templates do not include artwork or edits.',
+ surface_raise:'Raised',surface_dent:'Recessed',surface_flat:'Flat / painted detail',surface_left:'Faces left',surface_right:'Faces right',surface_up:'Faces up',surface_down:'Faces down',surface_radius:'Radius (px)',surface_undo:'Undo stroke',surface_clear:'Clear edits',surface_preview:'Normal preview',surface_limit:'4000 stamps reached. Undo or clear edits before painting more.'
+});
+Object.assign(I18N.ru, {
+ surface_category:'Категория генерации',surface_silhouette:'Объём по силуэту',surface_texture:'Рельеф текстуры',surface_sculpt:'Управляемая форма',surface_height:'Карта высот',
+ surface_hint:'Объём строится по альфа-силуэту. Детали цвета необязательны: чёрный глаз может оставаться окраской. В режиме текстуры задайте детали цвета выше нуля.',
+ surface_height_hint:'Загрузите серую карту высот точно такого же размера, как кадр/слой. Белое — выше, чёрное — ниже; можно инвертировать. Без карты поверхность плоская.',
+ surface_volume:'Объём тела',surface_detail:'Детали цвета (0 — игнорировать цвет)',surface_smooth:'Сглаживание деталей',surface_dark:'Тёмное = выпуклое (текстура / высота)',surface_edit:'Редактировать текущий кадр / слой',surface_load:'Загрузить карту высот для кадра / слоя',
+ surface_select:'Загрузите спрайт или выберите отдельный слой (solo).',surface_size:'Размер карты высот должен точно совпадать с кадром/слоем.',surface_invalid:'Не удалось прочитать карту высот.',surface_grid:'Некорректная сетка: ячейки должны содержать пиксели, начальный кадр должен существовать.',
+ surface_editor_hint:'Рисуйте по изображению. Правки работают в режиме «Управляемая форма» только для текущего кадра/слоя. Они остаются во вкладке проекта в течение сессии; шаблоны настроек не содержат изображения и правки.',
+ surface_raise:'Выпуклость',surface_dent:'Впадина',surface_flat:'Плоскость / окраска',surface_left:'Наклон влево',surface_right:'Наклон вправо',surface_up:'Наклон вверх',surface_down:'Наклон вниз',surface_radius:'Радиус (px)',surface_undo:'Отменить мазок',surface_clear:'Очистить правки',surface_preview:'Превью нормалей',surface_limit:'Достигнут лимит 4000 отпечатков. Отмените мазок или очистите правки.'
+});
